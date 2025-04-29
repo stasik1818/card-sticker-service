@@ -23,6 +23,26 @@ const frame = document.getElementById('frame');
 let isDragging = false;
 let offsetX, offsetY;
 let scale = 1;
+let translateX = 0;
+let translateY = 0;
+let startX, startY;
+let lastMoveTime = 0;
+const throttleDelay = 16; // ~60 FPS
+
+// Плавное перетаскивание
+function updatePosition(clientX, clientY) {
+  if (!isDragging) return;
+  const now = performance.now();
+  if (now - lastMoveTime < throttleDelay) return;
+  lastMoveTime = now;
+  const frameRect = frame.getBoundingClientRect();
+  const deltaX = clientX - startX;
+  const deltaY = clientY - startY;
+  translateX = deltaX;
+  translateY = deltaY;
+  imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+  requestAnimationFrame(() => updatePosition(clientX, clientY));
+}
 
 // Загрузка изображения
 imageUpload.addEventListener('change', function (e) {
@@ -32,8 +52,8 @@ imageUpload.addEventListener('change', function (e) {
     console.log('No file selected');
     return;
   }
-  if (file.size > 25 * 1024 * 1024) {
-    alert('Файл слишком большой! Максимум 25 МБ.');
+  if (file.size > 10 * 1024 * 1024) {
+    alert('Файл слишком большой! Максимум 10 МБ.');
     console.log('File too large:', file.size);
     return;
   }
@@ -48,9 +68,10 @@ imageUpload.addEventListener('change', function (e) {
     try {
       console.log('FileReader loaded data');
       imagePreview.src = event.target.result;
-      // Сбрасываем состояние
       scale = 1;
-      imagePreview.style.transform = `scale(${scale})`;
+      translateX = 0;
+      translateY = 0;
+      imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
       imagePreview.style.left = '0px';
       imagePreview.style.top = '0px';
       imagePreview.classList.add('loaded');
@@ -71,10 +92,11 @@ imageUpload.addEventListener('change', function (e) {
 // Перетаскивание мышью
 imagePreview.addEventListener('mousedown', function (e) {
   isDragging = true;
-  offsetX = e.clientX - imagePreview.getBoundingClientRect().left;
-  offsetY = e.clientY - imagePreview.getBoundingClientRect().top;
+  startX = e.clientX - translateX;
+  startY = e.clientY - translateY;
   imagePreview.style.cursor = 'grabbing';
   console.log('Drag started (mouse)');
+  updatePosition(e.clientX, e.clientY);
 });
 
 // Перетаскивание сенсором
@@ -82,18 +104,15 @@ imagePreview.addEventListener('touchstart', function (e) {
   e.preventDefault();
   isDragging = true;
   const touch = e.touches[0];
-  offsetX = touch.clientX - imagePreview.getBoundingClientRect().left;
-  offsetY = touch.clientY - imagePreview.getBoundingClientRect().top;
+  startX = touch.clientX - translateX;
+  startY = touch.clientY - translateY;
   console.log('Drag started (touch)');
+  updatePosition(touch.clientX, touch.clientY);
 });
 
 document.addEventListener('mousemove', function (e) {
   if (isDragging) {
-    const frameRect = frame.getBoundingClientRect();
-    let newLeft = e.clientX - offsetX - frameRect.left;
-    let newTop = e.clientY - offsetY - frameRect.top;
-    imagePreview.style.left = `${newLeft}px`;
-    imagePreview.style.top = `${newTop}px`;
+    updatePosition(e.clientX, e.clientY);
   }
 });
 
@@ -101,11 +120,7 @@ document.addEventListener('touchmove', function (e) {
   if (isDragging) {
     e.preventDefault();
     const touch = e.touches[0];
-    const frameRect = frame.getBoundingClientRect();
-    let newLeft = touch.clientX - offsetX - frameRect.left;
-    let newTop = touch.clientY - offsetY - frameRect.top;
-    imagePreview.style.left = `${newLeft}px`;
-    imagePreview.style.top = `${newTop}px`;
+    updatePosition(touch.clientX, touch.clientY);
   }
 });
 
@@ -129,7 +144,7 @@ imagePreview.addEventListener('wheel', function (e) {
     scale -= 0.1;
   }
   scale = Math.min(Math.max(0.01, scale), 25);
-  imagePreview.style.transform = `scale(${scale})`;
+  imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
   console.log(`Scale updated to: ${scale}`);
 });
 
@@ -145,6 +160,11 @@ function submitImage() {
     console.log('No name entered');
     return;
   }
+  if (typeof emailjs === 'undefined') {
+    alert('EmailJS не загружен. Пожалуйста, попробуйте позже.');
+    console.log('EmailJS not loaded');
+    return;
+  }
 
   console.log('Submit button clicked');
 
@@ -158,8 +178,8 @@ function submitImage() {
 
   const sx = (frameRect.left - imageRect.left) / scale;
   const sy = (frameRect.top - imageRect.top) / scale;
-  const sWidth = 428 / scale;
-  const sHeight = 270 / scale;
+  const sWidth = frameRect.width / scale;
+  const sHeight = frameRect.height / scale;
 
   const img = new Image();
   img.src = imagePreview.src;
@@ -167,8 +187,9 @@ function submitImage() {
   img.onload = () => {
     try {
       console.log('Canvas image loaded');
-      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, 1011, 638);
-      const base64data = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
+      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+      const base64data = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+      console.log('Base64 data size:', (base64data.length * 3 / 4 / 1024).toFixed(2), 'KB');
 
       console.log('Sending EmailJS request');
       emailjs.send('service_91166rkvva2', 'template_1e7wmua', {
@@ -180,7 +201,7 @@ function submitImage() {
         console.log('Order sent via EmailJS');
       }).catch((error) => {
         console.error('Ошибка отправки:', error);
-        alert('Ошибка при отправке заказа.');
+        alert('Ошибка при отправке заказа: ' + (error.text || 'Неизвестная ошибка'));
       });
 
       canvas.toBlob((blob) => {
@@ -190,8 +211,8 @@ function submitImage() {
         link.download = 'cropped_image.jpg';
         link.click();
         window.URL.revokeObjectURL(url);
-        console.log('Image downloaded');
-      }, 'image/jpeg', 0.9);
+        console.log('Image downloaded, size:', (blob.size / 1024).toFixed(2), 'KB');
+      }, 'image/jpeg', 0.7);
     } catch (error) {
       console.error('Error processing canvas:', error);
       alert('Ошибка при обработке изображения.');
