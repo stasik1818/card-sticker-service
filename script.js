@@ -1,17 +1,18 @@
 console.log('script.js loaded');
 
-// Ждём загрузки EmailJS
+// Инициализация EmailJS
 function initEmailJS() {
   if (typeof emailjs === 'undefined') {
     console.error('EmailJS not loaded, retrying in 500ms');
     setTimeout(initEmailJS, 500);
     return;
   }
-  emailjs.init("LLTnqHOpCj7sKSuda").then(() => {
+  try {
+    emailjs.init("LLTnqHOpCj7sKSuda");
     console.log('EmailJS initialized');
-  }).catch((error) => {
+  } catch (error) {
     console.error('EmailJS initialization failed:', error);
-  });
+  }
 }
 initEmailJS();
 
@@ -20,20 +21,16 @@ const imagePreview = document.getElementById('imagePreview');
 const nameInput = document.getElementById('nameInput');
 const commentInput = document.getElementById('commentInput');
 const frame = document.getElementById('frame');
+const submitButton = document.getElementById('submitButton');
+
 let isDragging = false;
-let offsetX, offsetY;
-let scale = 1;
+let startX, startY;
 let translateX = 0;
 let translateY = 0;
+let scale = 1;
 
-// Плавное перетаскивание
-function updatePosition(clientX, clientY) {
-  if (!isDragging) return;
-  const frameRect = frame.getBoundingClientRect();
-  translateX = clientX - offsetX - frameRect.left;
-  translateY = clientY - offsetY - frameRect.top;
-  imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
-}
+// Обработчик кнопки отправки
+submitButton.addEventListener('click', submitImage);
 
 // Загрузка изображения
 imageUpload.addEventListener('change', function (e) {
@@ -81,8 +78,10 @@ imageUpload.addEventListener('change', function (e) {
 // Перетаскивание мышью
 imagePreview.addEventListener('mousedown', function (e) {
   isDragging = true;
-  offsetX = e.clientX - translateX;
-  offsetY = e.clientY - translateY;
+  startX = e.clientX;
+  startY = e.clientY;
+  initialTranslateX = translateX;
+  initialTranslateY = translateY;
   imagePreview.style.transition = 'none';
   console.log('Drag started (mouse)');
 });
@@ -92,8 +91,10 @@ imagePreview.addEventListener('touchstart', function (e) {
   e.preventDefault();
   isDragging = true;
   const touch = e.touches[0];
-  offsetX = touch.clientX - translateX;
-  offsetY = touch.clientY - translateY;
+  startX = touch.clientX;
+  startY = touch.clientY;
+  initialTranslateX = translateX;
+  initialTranslateY = translateY;
   imagePreview.style.transition = 'none';
   console.log('Drag started (touch)');
 });
@@ -101,7 +102,11 @@ imagePreview.addEventListener('touchstart', function (e) {
 // Движение
 document.addEventListener('mousemove', function (e) {
   if (isDragging) {
-    requestAnimationFrame(() => updatePosition(e.clientX, e.clientY));
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+    translateX = initialTranslateX + deltaX;
+    translateY = initialTranslateY + deltaY;
+    imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
   }
 });
 
@@ -109,7 +114,11 @@ document.addEventListener('touchmove', function (e) {
   if (isDragging) {
     e.preventDefault();
     const touch = e.touches[0];
-    requestAnimationFrame(() => updatePosition(touch.clientX, touch.clientY));
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+    translateX = initialTranslateX + deltaX;
+    translateY = initialTranslateY + deltaY;
+    imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
   }
 });
 
