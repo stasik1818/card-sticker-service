@@ -25,23 +25,14 @@ let offsetX, offsetY;
 let scale = 1;
 let translateX = 0;
 let translateY = 0;
-let startX, startY;
-let lastMoveTime = 0;
-const throttleDelay = 16; // ~60 FPS
 
 // Плавное перетаскивание
 function updatePosition(clientX, clientY) {
   if (!isDragging) return;
-  const now = performance.now();
-  if (now - lastMoveTime < throttleDelay) return;
-  lastMoveTime = now;
   const frameRect = frame.getBoundingClientRect();
-  const deltaX = clientX - startX;
-  const deltaY = clientY - startY;
-  translateX = deltaX;
-  translateY = deltaY;
+  translateX = clientX - offsetX - frameRect.left;
+  translateY = clientY - offsetY - frameRect.top;
   imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
-  requestAnimationFrame(() => updatePosition(clientX, clientY));
 }
 
 // Загрузка изображения
@@ -72,8 +63,6 @@ imageUpload.addEventListener('change', function (e) {
       translateX = 0;
       translateY = 0;
       imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
-      imagePreview.style.left = '0px';
-      imagePreview.style.top = '0px';
       imagePreview.classList.add('loaded');
       console.log('Image loaded successfully, src set');
     } catch (error) {
@@ -92,11 +81,10 @@ imageUpload.addEventListener('change', function (e) {
 // Перетаскивание мышью
 imagePreview.addEventListener('mousedown', function (e) {
   isDragging = true;
-  startX = e.clientX - translateX;
-  startY = e.clientY - translateY;
-  imagePreview.style.cursor = 'grabbing';
+  offsetX = e.clientX - translateX;
+  offsetY = e.clientY - translateY;
+  imagePreview.style.transition = 'none';
   console.log('Drag started (mouse)');
-  updatePosition(e.clientX, e.clientY);
 });
 
 // Перетаскивание сенсором
@@ -104,15 +92,16 @@ imagePreview.addEventListener('touchstart', function (e) {
   e.preventDefault();
   isDragging = true;
   const touch = e.touches[0];
-  startX = touch.clientX - translateX;
-  startY = touch.clientY - translateY;
+  offsetX = touch.clientX - translateX;
+  offsetY = touch.clientY - translateY;
+  imagePreview.style.transition = 'none';
   console.log('Drag started (touch)');
-  updatePosition(touch.clientX, touch.clientY);
 });
 
+// Движение
 document.addEventListener('mousemove', function (e) {
   if (isDragging) {
-    updatePosition(e.clientX, e.clientY);
+    requestAnimationFrame(() => updatePosition(e.clientX, e.clientY));
   }
 });
 
@@ -120,18 +109,20 @@ document.addEventListener('touchmove', function (e) {
   if (isDragging) {
     e.preventDefault();
     const touch = e.touches[0];
-    updatePosition(touch.clientX, touch.clientY);
+    requestAnimationFrame(() => updatePosition(touch.clientX, touch.clientY));
   }
 });
 
+// Конец перетаскивания
 document.addEventListener('mouseup', function () {
   isDragging = false;
-  imagePreview.style.cursor = 'grab';
+  imagePreview.style.transition = 'transform 0.05s ease-out';
   console.log('Drag ended (mouse)');
 });
 
 document.addEventListener('touchend', function () {
   isDragging = false;
+  imagePreview.style.transition = 'transform 0.05s ease-out';
   console.log('Drag ended (touch)');
 });
 
