@@ -1,5 +1,20 @@
 console.log('script.js loaded');
 
+// Функция для рисования скруглённого прямоугольника
+function roundedRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
 // Инициализация EmailJS
 function initEmailJS() {
   if (typeof emailjs === 'undefined') {
@@ -28,6 +43,8 @@ let startX, startY;
 let translateX = 0;
 let translateY = 0;
 let scale = 1;
+let initialTranslateX = 0;
+let initialTranslateY = 0;
 
 // Обработчик кнопки отправки
 submitButton.addEventListener('click', submitImage);
@@ -40,8 +57,8 @@ imageUpload.addEventListener('change', function (e) {
     console.log('No file selected');
     return;
   }
-  if (file.size > 10 * 1024 * 1024) {
-    alert('Файл слишком большой! Максимум 10 МБ.');
+  if (file.size > 25 * 1024 * 1024) {
+    alert('Файл слишком большой! Максимум 25 МБ. Пожалуйста, уменьшите размер файла.');
     console.log('File too large:', file.size);
     return;
   }
@@ -59,6 +76,8 @@ imageUpload.addEventListener('change', function (e) {
       scale = 1;
       translateX = 0;
       translateY = 0;
+      initialTranslateX = 0;
+      initialTranslateY = 0;
       imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
       imagePreview.classList.add('loaded');
       console.log('Image loaded successfully, src set');
@@ -187,9 +206,22 @@ function submitImage() {
   img.onload = () => {
     try {
       console.log('Canvas image loaded');
+      // Рисуем скруглённый прямоугольник и обрезаем
+      const radius = 30;
+      roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
+      ctx.clip();
+      // Рисуем изображение
       ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
       const base64data = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-      console.log('Base64 data size:', (base64data.length * 3 / 4 / 1024).toFixed(2), 'KB');
+      const base64SizeKB = (base64data.length * 3 / 4 / 1024).toFixed(2);
+      console.log('Base64 data size:', base64SizeKB, 'KB');
+
+      // Проверка размера base64-данных
+      if (base64SizeKB > 2000) {
+        alert('Обрезанное изображение слишком большое для отправки (более 2 МБ). Пожалуйста, уменьшите масштаб или используйте менее детализированное изображение.');
+        console.log('Base64 data too large:', base64SizeKB, 'KB');
+        return;
+      }
 
       console.log('Sending EmailJS request');
       emailjs.send('service_91166rkvva2', 'template_1e7wmua', {
