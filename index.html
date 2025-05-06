@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.emailjs.com" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.telegram.org" />
   <title>Редактор наклеек для банковских карт</title>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" onload="console.log('EmailJS library loaded')" onerror="console.error('Failed to load EmailJS library')"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -49,7 +48,6 @@
       max-width: none;
       max-height: none;
       object-fit: none;
-      transform-origin: center center;
       left: 0;
       top: 0;
       display: none;
@@ -70,7 +68,7 @@
       cursor: pointer;
       font-size: 1em;
     }
-    input[type="text"], textarea {
+    input[type="text"], textarea, select {
       width: 90%;
       max-width: 300px;
       padding: 8px;
@@ -93,6 +91,9 @@
       cursor: pointer;
       font-size: 1em;
     }
+    button:hover {
+      background-color: #218838;
+    }
     @media (max-width: 600px) {
       .upload-area {
         width: 90vw;
@@ -101,11 +102,11 @@
       h2 {
         font-size: 1.2em;
       }
-      label.upload-btn, button {
+      label.upload-btn, button, select {
         padding: 6px 12px;
         font-size: 0.9em;
       }
-      input[type="text"], textarea {
+      input[type="text"], textarea, select {
         width: 85%;
         font-size: 0.9em;
       }
@@ -122,6 +123,12 @@
     <input type="file" id="imageUpload" accept="image/*" />
     <input type="text" id="nameInput" placeholder="Ваше имя" />
     <textarea id="commentInput" placeholder="Комментарий к заказу" rows="4"></textarea>
+    <select id="qualitySelect">
+      <option value="jpeg-low">JPEG (низкое качество, маленький размер)</option>
+      <option value="jpeg-medium" selected>JPEG (среднее качество)</option>
+      <option value="jpeg-high">JPEG (высокое качество)</option>
+      <option value="png">PNG (максимальное качество)</option>
+    </select>
     <button id="submitButton">Отправить</button>
   </div>
   <script src="script.js"></script>
