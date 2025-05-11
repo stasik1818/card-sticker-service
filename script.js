@@ -98,7 +98,7 @@ imageUpload.addEventListener('change', function (e) {
   };
   reader.onerror = function (error) {
     console.error('Ошибка чтения файла:', error);
-    alert('Ошибка при чтении файла.');
+    alert('Ошибка при чтения файла.');
   };
   reader.readAsDataURL(file);
   console.log('Читаем файл:', file.name);
@@ -191,7 +191,7 @@ document.addEventListener('touchend', function (e) {
   }
 });
 
-// Зум колесом от курсора
+// Зум колесом
 imagePreview.addEventListener('wheel', function (e) {
   e.preventDefault();
 
@@ -208,7 +208,6 @@ imagePreview.addEventListener('wheel', function (e) {
   const preZoomImageY = (mouseY - translateY) / scale;
 
   // Обновляем масштаб
-  const prevScale = scale;
   if (e.deltaY < 0) {
     scale += 0.05; // Зум вперёд
   } else {
@@ -244,27 +243,27 @@ async function submitImage() {
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  canvas.width = 1200; // Для печати (~350 DPI)
+  canvas.width = 1200;
   canvas.height = 757;
 
   const frameRect = frame.getBoundingClientRect();
-  const imageRect = imagePreview.getBoundingClientRect();
-  const pixelRatio = window.devicePixelRatio || 1;
+  const imageWidth = imagePreview.naturalWidth;
+  const imageHeight = imagePreview.naturalHeight;
 
   // Рассчитываем координаты области рамки относительно изображения
-  let sx = (frameRect.left - imageRect.left) / scale / pixelRatio;
-  let sy = (frameRect.top - imageRect.top) / scale / pixelRatio;
-  let sWidth = frameRect.width / scale / pixelRatio;
-  let sHeight = frameRect.height / scale / pixelRatio;
+  let sx = (-translateX / scale) * (imageWidth / frameRect.width);
+  let sy = (-translateY / scale) * (imageHeight / frameRect.height);
+  let sWidth = (frameRect.width / scale) * (imageWidth / frameRect.width);
+  let sHeight = (frameRect.height / scale) * (imageHeight / frameRect.height);
 
-  console.log('Координаты для обрезки:', { sx, sy, sWidth, sHeight, scale, pixelRatio, frameRect, imageRect });
+  console.log('Координаты для обрезки:', { sx, sy, sWidth, sHeight, scale, translateX, translateY, frameWidth: frameRect.width, frameHeight: frameRect.height });
 
   const img = new Image();
   img.src = imagePreview.src;
 
   try {
     await new Promise((resolve, reject) => {
-      img.crossOrigin = 'Anonymous'; // Для избежания CORS
+      img.crossOrigin = 'Anonymous';
       img.onload = () => {
         console.log('Фотка для canvas загружена', { naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
         resolve();
@@ -295,20 +294,28 @@ async function submitImage() {
     const canvasAspect = canvas.width / canvas.height;
     let destWidth, destHeight, destX, destY;
 
-    const scaleFactor = Math.min(canvas.width / sWidth, canvas.height / sHeight);
-    destWidth = sWidth * scaleFactor;
-    destHeight = sHeight * scaleFactor;
-    destX = (canvas.width - destWidth) / 2;
-    destY = (canvas.height - destHeight) / 2;
+    if (sourceAspect > canvasAspect) {
+      // Изображение шире, чем холст
+      destWidth = canvas.width;
+      destHeight = canvas.width / sourceAspect;
+      destX = 0;
+      destY = (canvas.height - destHeight) / 2;
+    } else {
+      // Изображение выше, чем холст
+      destHeight = canvas.height;
+      destWidth = canvas.height * sourceAspect;
+      destX = (canvas.width - destWidth) / 2;
+      destY = 0;
+    }
 
-    console.log('Параметры рендеринга:', { destWidth, destHeight, destX, destY, scaleFactor, sourceAspect, canvasAspect });
+    console.log('Параметры рендеринга:', { destWidth, destHeight, destX, destY, sourceAspect, canvasAspect });
 
     // Заполняем фон чёрным для letterbox
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Рисуем скруглённый прямоугольник и обрезаем
-    const radius = 36; // Пропорционально разрешению
+    const radius = 36;
     roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
     ctx.clip();
 
@@ -336,7 +343,7 @@ async function submitImage() {
         break;
       case 'png':
         mimeType = 'image/png';
-        qualityValue = undefined; // PNG без сжатия
+        qualityValue = undefined;
         fileExtension = 'png';
         break;
       default:
