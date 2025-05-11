@@ -98,7 +98,7 @@ imageUpload.addEventListener('change', function (e) {
   };
   reader.onerror = function (error) {
     console.error('Ошибка чтения файла:', error);
-    alert('Ошибка при чтения файла.');
+    alert('Ошибка при чтении файла.');
   };
   reader.readAsDataURL(file);
   console.log('Читаем файл:', file.name);
@@ -250,10 +250,10 @@ async function submitImage() {
   const frameRect = frame.getBoundingClientRect();
   const imageRect = imagePreview.getBoundingClientRect();
 
-  const sx = (frameRect.left - imageRect.left) / scale;
-  const sy = (frameRect.top - imageRect.top) / scale;
-  const sWidth = frameRect.width / scale;
-  const sHeight = frameRect.height / scale;
+  let sx = (frameRect.left - imageRect.left) / scale;
+  let sy = (frameRect.top - imageRect.top) / scale;
+  let sWidth = frameRect.width / scale;
+  let sHeight = frameRect.height / scale;
 
   const img = new Image();
   img.src = imagePreview.src;
@@ -270,24 +270,26 @@ async function submitImage() {
       };
     });
 
-    // Рассчитываем пропорции выбранной области
+    // Проверяем корректность размеров исходной области
+    if (sWidth <= 0 || sHeight <= 0 || isNaN(sx) || isNaN(sy)) {
+      console.error('Некорректные размеры области:', { sx, sy, sWidth, sHeight });
+      alert('Ошибка: некорректная область изображения.');
+      return;
+    }
+
+    // Рассчитываем пропорции для рендеринга
     const sourceAspect = sWidth / sHeight;
     const canvasAspect = canvas.width / canvas.height;
     let destWidth, destHeight, destX, destY;
 
-    if (sourceAspect > canvasAspect) {
-      // Исходная область шире, чем canvas
-      destWidth = canvas.width;
-      destHeight = canvas.width / sourceAspect;
-      destX = 0;
-      destY = (canvas.height - destHeight) / 2;
-    } else {
-      // Исходная область выше, чем canvas
-      destHeight = canvas.height;
-      destWidth = canvas.height * sourceAspect;
-      destX = (canvas.width - destWidth) / 2;
-      destY = 0;
-    }
+    // Масштабируем, чтобы изображение влезло без растяжения
+    const scaleFactor = Math.min(canvas.width / sWidth, canvas.height / sHeight);
+    destWidth = sWidth * scaleFactor;
+    destHeight = sHeight * scaleFactor;
+
+    // Центрируем изображение
+    destX = (canvas.width - destWidth) / 2;
+    destY = (canvas.height - destHeight) / 2;
 
     // Заполняем фон чёрным для letterbox
     ctx.fillStyle = '#000000';
