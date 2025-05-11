@@ -71,8 +71,8 @@ imageUpload.addEventListener('change', function (e) {
         const imageWidth = imagePreview.naturalWidth;
         const imageHeight = imagePreview.naturalHeight;
         // Рассчитываем масштаб, чтобы изображение заполнило окно
-        let initialScale = Math.max(frameWidth / imageWidth, frameHeight / imageHeight) * 1.2; // Заполняем по большей стороне, увеличиваем на 20%
-        initialScale = Math.min(initialScale, 3); // Ограничиваем максимальный масштаб
+        let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight);
+        initialScale = Math.min(initialScale, 3);
         // Центрируем изображение
         const scaledWidth = imageWidth * initialScale;
         const scaledHeight = imageHeight * initialScale;
@@ -81,9 +81,9 @@ imageUpload.addEventListener('change', function (e) {
         scale = initialScale;
         // Применяем трансформацию
         imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-        imagePreview.style.transformOrigin = '0 0';
+        imagePreview.style.transformOrigin = 'center center';
         imagePreview.classList.add('loaded');
-        console.log('Картинка загружена и центрирована', { initialScale, translateX, translateY, imageWidth, imageHeight });
+        console.log('Картинка загружена и центрирована', { initialScale, translateX, translateY, imageWidth, imageHeight, frameWidth, frameHeight });
       };
     } catch (error) {
       console.error('Ошибка с картинкой:', error);
@@ -179,7 +179,7 @@ document.addEventListener('mouseup', function () {
 document.addEventListener('touchend', function (e) {
   isDragging = false;
   if (e.touches.length < 2) {
-    imagePreview.style.transformOrigin = '0 0';
+    imagePreview.style.transformOrigin = 'center center';
     imagePreview.style.transition = 'transform 0.05s ease-out';
     console.log('Отпустили (сенсор или конец зума пальцами)');
   }
@@ -221,11 +221,20 @@ async function submitImage() {
   const imageWidth = imagePreview.naturalWidth;
   const imageHeight = imagePreview.naturalHeight;
 
-  // Рассчитываем область, видимую в окне
-  const sx = (-translateX / scale) * (imageWidth / frameRect.width);
-  const sy = (-translateY / scale) * (imageHeight / frameRect.height);
-  const sWidth = imageWidth * (frameRect.width / (imageWidth * scale));
-  const sHeight = imageHeight * (frameRect.height / (imageHeight * scale));
+  // Рассчитываем координаты и размеры области, видимой в окне
+  const frameWidth = frameRect.width;
+  const frameHeight = frameRect.height;
+  const scaledWidth = imageWidth * scale;
+  const scaledHeight = imageHeight * scale;
+
+  // Координаты верхнего левого угла видимой области в координатах изображения
+  const sx = ((frameWidth / 2 - translateX) / scaledWidth) * imageWidth;
+  const sy = ((frameHeight / 2 - translateY) / scaledHeight) * imageHeight;
+  const sWidth = (frameWidth / scaledWidth) * imageWidth;
+  const sHeight = (frameHeight / scaledHeight) * imageHeight;
+
+  // Логируем параметры для отладки
+  console.log('Canvas params:', { sx, sy, sWidth, sHeight, translateX, translateY, scale, imageWidth, imageHeight, frameWidth, frameHeight });
 
   const img = new Image();
   img.src = imagePreview.src;
