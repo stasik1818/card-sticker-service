@@ -15,6 +15,47 @@ function roundedRect(ctx, x, y, width, height, radius) {
   ctx.closePath();
 }
 
+// Функция для сжатия изображения
+async function compressImage(file, maxDimension = 4096) {
+  console.log('Сжимаем изображение:', file.name);
+  const img = new Image();
+  const blob = await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+  img.src = blob;
+
+  await new Promise((resolve) => (img.onload = resolve));
+
+  let { width, height } = img;
+  let scaleFactor = 1;
+  if (width > maxDimension || height > maxDimension) {
+    scaleFactor = Math.min(maxDimension / width, maxDimension / height);
+    width = Math.round(width * scaleFactor);
+    height = Math.round(height * scaleFactor);
+  }
+
+  console.log('Сжатые размеры:', { width, height, scaleFactor });
+
+  const canvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(width, height) : document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const compressedBlob = await new Promise((resolve) => {
+    if (canvas.convertToBlob) {
+      canvas.convertToBlob({ type: 'image/jpeg', quality: 0.8 }).then(resolve);
+    } else {
+      canvas.toBlob(resolve, 'image/jpeg', 0.8);
+    }
+  });
+
+  console.log('Изображение сжато, размер:', (compressedBlob.size / 1024).toFixed(2), 'KB');
+  return compressedBlob;
+}
+
 const imageUpload = document.getElementById('imageUpload');
 const imagePreview = document.getElementById('imagePreview');
 const nameInput = document.getElementById('nameInput');
@@ -40,7 +81,7 @@ let pinchStartScale = 1;
 submitButton.addEventListener('click', submitImage);
 
 // Загрузка фотки
-imageUpload.addEventListener('change', function (e) {
+imageUpload.addEventListener('change', async function (e) {
   console.log('Выбрали файл');
   const file = e.target.files[0];
   if (!file) {
@@ -58,50 +99,56 @@ imageUpload.addEventListener('change', function (e) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = function (event) {
-    try {
-      console.log('Файл прочитан');
-      imagePreview.src = event.target.result;
-      // Ждём загрузки изображения
-      imagePreview.onload = function() {
-        const frameRect = frame.getBoundingClientRect();
-        const frameWidth = frameRect.width;
-        const frameHeight = frameRect.height;
-        const imageWidth = imagePreview.naturalWidth;
-        const imageHeight = imagePreview.naturalHeight;
-        // Рассчитываем масштаб, чтобы изображение влезло в окно
-        let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight);
-        // Если изображение меньше окна, масштаб = 1
-        if (imageWidth <= frameWidth && imageHeight <= frameHeight) {
-          initialScale = 1;
-        }
-        // Центрируем изображение
-        const scaledWidth = imageWidth * initialScale;
-        const scaledHeight = imageHeight * initialScale;
-        let initialTranslateX = (frameWidth - scaledWidth) / 2;
-        let initialTranslateY = (frameHeight - scaledHeight) / 2;
-        // Устанавливаем глобальные переменные
-        translateX = initialTranslateX;
-        translateY = initialTranslateY;
-        scale = initialScale;
-        // Применяем трансформацию
-        imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
-        imagePreview.style.transformOrigin = '0 0';
-        imagePreview.classList.add('loaded');
-        console.log('Картинка загружена и отмасштабирована, src установлен');
-      };
-    } catch (error) {
-      console.error('Ошибка с картинкой:', error);
-      alert('Не могу загрузить фотку.');
-    }
-  };
-  reader.onerror = function (error) {
-    console.error('Ошибка чтения файла:', error);
-    alert('Ошибка при чтении файла.');
-  };
-  reader.readAsDataURL(file);
-  console.log('Читаем файл:', file.name);
+  try {
+    const compressedBlob = await compressImage(file, 4096);
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      try {
+        console.log('Файл прочитан');
+        imagePreview.src = event.target.result;
+        // Ждём загрузки изображения
+        imagePreview.onload = function() {
+          const frameRect = frame.getBoundingClientRect();
+          const frameWidth = frameRect.width;
+          const frameHeight = frameRect.height;
+          const imageWidth = imagePreview.naturalWidth;
+          const imageHeight = imagePreview.naturalHeight;
+          // Рассчитываем масштаб, чтобы изображение влезло в окно
+          let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight);
+          // Если изображение меньше окна, масштаб = 1
+          if (imageWidth <= frameWidth && imageHeight <= frameHeight) {
+            initialScale = 1;
+          }
+          // Центрируем изображение
+          const scaledWidth = imageWidth * initialScale;
+          const scaledHeight = imageHeight * initialScale;
+          let initialTranslateX = (frameWidth - scaledWidth) / 2;
+          let initialTranslateY = (frameHeight - scaledHeight) / 2;
+          // Устанавливаем глобальные переменные
+          translateX = initialTranslateX;
+          translateY = initialTranslateY;
+          scale = initialScale;
+          // Применяем трансформацию
+          imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+          imagePreview.style.transformOrigin = '0 0';
+          imagePreview.classList.add('loaded');
+          console.log('Картинка загружена и отмасштабирована', { initialScale, translateX, translateY, imageWidth, imageHeight });
+        };
+      } catch (error) {
+        console.error('Ошибка с картинкой:', error);
+        alert('Не могу загрузить фотку.');
+      }
+    };
+    reader.onerror = function (error) {
+      console.error('Ошибка чтения файла:', error);
+      alert('Ошибка при чтении файла.');
+    };
+    reader.readAsDataURL(compressedBlob);
+    console.log('Читаем сжатый файл');
+  } catch (error) {
+    console.error('Ошибка сжатия:', error);
+    alert('Ошибка при обработке фотки.');
+  }
 });
 
 // Тащим фотку мышкой
@@ -249,11 +296,22 @@ async function submitImage() {
 
   const frameRect = frame.getBoundingClientRect();
   const imageRect = imagePreview.getBoundingClientRect();
+  const pixelRatio = window.devicePixelRatio || 1;
 
-  let sx = (frameRect.left - imageRect.left) / scale;
-  let sy = (frameRect.top - imageRect.top) / scale;
-  let sWidth = frameRect.width / scale;
-  let sHeight = frameRect.height / scale;
+  // Рассчитываем координаты рамки относительно изображения
+  let sx = (frameRect.left - imageRect.left) / scale / pixelRatio;
+  let sy = (frameRect.top - imageRect.top) / scale / pixelRatio;
+  let sWidth = frameRect.width / scale / pixelRatio;
+  let sHeight = frameRect.height / scale / pixelRatio;
+
+  console.log('Координаты для обрезки:', { sx, sy, sWidth, sHeight, scale, pixelRatio });
+
+  // Проверяем корректность координат
+  if (sWidth <= 0 || sHeight <= 0 || isNaN(sx) || isNaN(sy) || isNaN(sWidth) || isNaN(sHeight)) {
+    console.error('Некорректные размеры области:', { sx, sy, sWidth, sHeight });
+    alert('Ошибка: некорректная область изображения.');
+    return;
+  }
 
   const img = new Image();
   img.src = imagePreview.src;
@@ -261,7 +319,7 @@ async function submitImage() {
   try {
     await new Promise((resolve, reject) => {
       img.onload = () => {
-        console.log('Фотка для canvas загружена');
+        console.log('Фотка для canvas загружена', { naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
         resolve();
       };
       img.onerror = () => {
@@ -270,26 +328,22 @@ async function submitImage() {
       };
     });
 
-    // Проверяем корректность размеров исходной области
-    if (sWidth <= 0 || sHeight <= 0 || isNaN(sx) || isNaN(sy)) {
-      console.error('Некорректные размеры области:', { sx, sy, sWidth, sHeight });
-      alert('Ошибка: некорректная область изображения.');
-      return;
-    }
+    // Проверяем, что координаты не выходят за пределы изображения
+    sx = Math.max(0, Math.min(sx, img.naturalWidth - sWidth));
+    sy = Math.max(0, Math.min(sy, img.naturalHeight - sHeight));
+    sWidth = Math.min(sWidth, img.naturalWidth - sx);
+    sHeight = Math.min(sHeight, img.naturalHeight - sy);
+
+    console.log('Скорректированные координаты:', { sx, sy, sWidth, sHeight });
 
     // Рассчитываем пропорции для рендеринга
-    const sourceAspect = sWidth / sHeight;
-    const canvasAspect = canvas.width / canvas.height;
-    let destWidth, destHeight, destX, destY;
-
-    // Масштабируем, чтобы изображение влезло без растяжения
     const scaleFactor = Math.min(canvas.width / sWidth, canvas.height / sHeight);
-    destWidth = sWidth * scaleFactor;
-    destHeight = sHeight * scaleFactor;
+    const destWidth = sWidth * scaleFactor;
+    const destHeight = sHeight * scaleFactor;
+    const destX = (canvas.width - destWidth) / 2;
+    const destY = (canvas.height - destHeight) / 2;
 
-    // Центрируем изображение
-    destX = (canvas.width - destWidth) / 2;
-    destY = (canvas.height - destHeight) / 2;
+    console.log('Параметры рендеринга:', { destWidth, destHeight, destX, destY, scaleFactor });
 
     // Заполняем фон чёрным для letterbox
     ctx.fillStyle = '#000000';
@@ -347,7 +401,7 @@ async function submitImage() {
     const blobSizeKB = (blob.size / 1024).toFixed(2);
     console.log('Размер Blob:', blobSizeKB, 'KB');
     if (blob.size > 10 * 1024 * 1024) {
-      alert('Фотка слишком жирная для Telegram (больше 10 МБ). Попробуй JPEG с меньшим качеством или меньше зума.');
+      alert('Фотка слишком жирная для Telegram (больше 10 МБ). Попробуй JPEG с меньшим качеством.');
       console.log('Blob слишком большой:', blobSizeKB, 'KB');
       return;
     }
