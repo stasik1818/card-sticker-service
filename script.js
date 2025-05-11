@@ -70,23 +70,20 @@ imageUpload.addEventListener('change', function (e) {
         const frameHeight = frameRect.height;
         const imageWidth = imagePreview.naturalWidth;
         const imageHeight = imagePreview.naturalHeight;
-        // Рассчитываем масштаб, чтобы изображение было крупнее
-        let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight) * 1.5; // Увеличиваем масштаб в 1.5 раза
+        // Рассчитываем масштаб, чтобы изображение заполнило окно
+        let initialScale = Math.max(frameWidth / imageWidth, frameHeight / imageHeight) * 1.2; // Заполняем по большей стороне, увеличиваем на 20%
         initialScale = Math.min(initialScale, 3); // Ограничиваем максимальный масштаб
         // Центрируем изображение
         const scaledWidth = imageWidth * initialScale;
         const scaledHeight = imageHeight * initialScale;
-        let initialTranslateX = (frameWidth - scaledWidth) / 2;
-        let initialTranslateY = (frameHeight - scaledHeight) / 2;
-        // Устанавливаем глобальные переменные
-        translateX = initialTranslateX;
-        translateY = initialTranslateY;
+        translateX = (frameWidth - scaledWidth) / 2;
+        translateY = (frameHeight - scaledHeight) / 2;
         scale = initialScale;
         // Применяем трансформацию
-        imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+        imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
         imagePreview.style.transformOrigin = '0 0';
         imagePreview.classList.add('loaded');
-        console.log('Картинка загружена и отмасштабирована', { initialScale, translateX, translateY, imageWidth, imageHeight });
+        console.log('Картинка загружена и центрирована', { initialScale, translateX, translateY, imageWidth, imageHeight });
       };
     } catch (error) {
       console.error('Ошибка с картинкой:', error);
@@ -146,7 +143,7 @@ document.addEventListener('mousemove', function (e) {
     const deltaY = e.clientY - startY;
     translateX = initialTranslateX + deltaX;
     translateY = initialTranslateY + deltaY;
-    imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+    imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
   }
 });
 
@@ -158,7 +155,7 @@ document.addEventListener('touchmove', function (e) {
     const deltaY = touches[0].clientY - startY;
     translateX = initialTranslateX + deltaX;
     translateY = initialTranslateY + deltaY;
-    imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+    imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
   } else if (touches.length === 2) {
     // Зум пальцами
     const dx = touches[0].clientX - touches[1].clientX;
@@ -168,7 +165,7 @@ document.addEventListener('touchmove', function (e) {
     scale = pinchStartScale * scaleChange;
     scale = Math.min(Math.max(0.01, scale), 10);
     console.log(`Зум пальцами: ${scale}`);
-    imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+    imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
   }
 });
 
@@ -197,7 +194,7 @@ imagePreview.addEventListener('wheel', function (e) {
     scale -= 0.05; // Зум назад
   }
   scale = Math.min(Math.max(0.01, scale), 10);
-  imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+  imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
   console.log(`Зум колесом: ${scale}`);
 });
 
@@ -224,24 +221,11 @@ async function submitImage() {
   const imageWidth = imagePreview.naturalWidth;
   const imageHeight = imagePreview.naturalHeight;
 
-  // Рассчитываем координаты и размеры области, видимой в окне
-  const frameRatio = frameRect.width / frameRect.height;
-  const canvasRatio = canvas.width / canvas.height;
-  let sWidth = imageWidth;
-  let sHeight = imageHeight;
-  let sx = (-translateX / scale) * (imageWidth / frameRect.width);
-  let sy = (-translateY / scale) * (imageHeight / frameRect.height);
-
-  // Корректируем масштаб для соответствия пропорциям canvas
-  const scaleFactor = Math.min(canvas.width / (frameRect.width / scale), canvas.height / (frameRect.height / scale));
-  sWidth = (frameRect.width / scale) * (imageWidth / frameRect.width);
-  sHeight = (frameRect.height / scale) * (imageHeight / frameRect.height);
-
-  // Центрируем изображение на canvas
-  const dWidth = sWidth * scaleFactor;
-  const dHeight = sHeight * scaleFactor;
-  const dx = (canvas.width - dWidth) / 2;
-  const dy = (canvas.height - dHeight) / 2;
+  // Рассчитываем область, видимую в окне
+  const sx = (-translateX / scale) * (imageWidth / frameRect.width);
+  const sy = (-translateY / scale) * (imageHeight / frameRect.height);
+  const sWidth = imageWidth * (frameRect.width / (imageWidth * scale));
+  const sHeight = imageHeight * (frameRect.height / (imageHeight * scale));
 
   const img = new Image();
   img.src = imagePreview.src;
@@ -264,8 +248,8 @@ async function submitImage() {
     roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
     ctx.clip();
 
-    // Рисуем изображение
-    ctx.drawImage(img, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+    // Рисуем изображение, масштабируя до размеров canvas
+    ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
     // Определяем формат и качество
     const quality = qualitySelect.value;
