@@ -26,6 +26,9 @@
       max-width: 600px;
       box-sizing: border-box;
       overscroll-behavior: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     h1 {
       text-align: center;
@@ -35,11 +38,12 @@
     .frame-container {
       position: relative;
       width: 100%;
+      max-width: 100%;
       aspect-ratio: 1200 / 757;
       overflow: hidden;
       border: 2px solid #333;
       border-radius: 12px;
-      margin-bottom: 20px;
+      margin: 0 auto 20px auto;
       box-sizing: border-box;
     }
     #frame {
@@ -70,6 +74,7 @@
     }
     .input-group {
       margin-bottom: 15px;
+      width: 100%;
     }
     label {
       display: block;
