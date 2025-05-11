@@ -252,18 +252,19 @@ async function submitImage() {
   const pixelRatio = window.devicePixelRatio || 1;
 
   // Рассчитываем координаты области рамки относительно изображения
-  let sx = (-translateX) / scale;
-  let sy = (-translateY) / scale;
-  let sWidth = frameRect.width / scale;
-  let sHeight = frameRect.height / scale;
+  let sx = (frameRect.left - imageRect.left) / scale / pixelRatio;
+  let sy = (frameRect.top - imageRect.top) / scale / pixelRatio;
+  let sWidth = frameRect.width / scale / pixelRatio;
+  let sHeight = frameRect.height / scale / pixelRatio;
 
-  console.log('Координаты для обрезки:', { sx, sy, sWidth, sHeight, scale, pixelRatio, translateX, translateY });
+  console.log('Координаты для обрезки:', { sx, sy, sWidth, sHeight, scale, pixelRatio, frameRect, imageRect });
 
   const img = new Image();
   img.src = imagePreview.src;
 
   try {
     await new Promise((resolve, reject) => {
+      img.crossOrigin = 'Anonymous'; // Для избежания CORS
       img.onload = () => {
         console.log('Фотка для canvas загружена', { naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
         resolve();
@@ -294,7 +295,6 @@ async function submitImage() {
     const canvasAspect = canvas.width / canvas.height;
     let destWidth, destHeight, destX, destY;
 
-    // Масштабируем, чтобы изображение влезло без растяжения
     const scaleFactor = Math.min(canvas.width / sWidth, canvas.height / sHeight);
     destWidth = sWidth * scaleFactor;
     destHeight = sHeight * scaleFactor;
