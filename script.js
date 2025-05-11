@@ -70,12 +70,9 @@ imageUpload.addEventListener('change', function (e) {
         const frameHeight = frameRect.height;
         const imageWidth = imagePreview.naturalWidth;
         const imageHeight = imagePreview.naturalHeight;
-        // Рассчитываем масштаб, чтобы изображение влезло в окно
-        let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight);
-        // Если изображение меньше окна, масштаб = 1
-        if (imageWidth <= frameWidth && imageHeight <= frameHeight) {
-          initialScale = 1;
-        }
+        // Рассчитываем масштаб, чтобы изображение было крупнее
+        let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight) * 1.5; // Увеличиваем масштаб в 1.5 раза
+        initialScale = Math.min(initialScale, 3); // Ограничиваем максимальный масштаб
         // Центрируем изображение
         const scaledWidth = imageWidth * initialScale;
         const scaledHeight = imageHeight * initialScale;
@@ -227,10 +224,24 @@ async function submitImage() {
   const imageWidth = imagePreview.naturalWidth;
   const imageHeight = imagePreview.naturalHeight;
 
-  let sx = (-translateX) / scale;
-  let sy = (-translateY) / scale;
-  let sWidth = frameRect.width / scale;
-  let sHeight = frameRect.height / scale;
+  // Рассчитываем координаты и размеры области, видимой в окне
+  const frameRatio = frameRect.width / frameRect.height;
+  const canvasRatio = canvas.width / canvas.height;
+  let sWidth = imageWidth;
+  let sHeight = imageHeight;
+  let sx = (-translateX / scale) * (imageWidth / frameRect.width);
+  let sy = (-translateY / scale) * (imageHeight / frameRect.height);
+
+  // Корректируем масштаб для соответствия пропорциям canvas
+  const scaleFactor = Math.min(canvas.width / (frameRect.width / scale), canvas.height / (frameRect.height / scale));
+  sWidth = (frameRect.width / scale) * (imageWidth / frameRect.width);
+  sHeight = (frameRect.height / scale) * (imageHeight / frameRect.height);
+
+  // Центрируем изображение на canvas
+  const dWidth = sWidth * scaleFactor;
+  const dHeight = sHeight * scaleFactor;
+  const dx = (canvas.width - dWidth) / 2;
+  const dy = (canvas.height - dHeight) / 2;
 
   const img = new Image();
   img.src = imagePreview.src;
@@ -243,14 +254,6 @@ async function submitImage() {
         reject(new Error('Ошибка загрузки фотки для обработки'));
       };
     });
-
-    const scaleFactor = Math.min(canvas.width / sWidth, canvas.height / sHeight);
-    const dWidth = sWidth * scaleFactor;
-    const dHeight = sHeight * scaleFactor;
-
-    // Центрируем изображение на canvas
-    const dx = (canvas.width - dWidth) / 2;
-    const dy = (canvas.height - dHeight) / 2;
 
     // Заполняем фон чёрным для letterbox
     ctx.fillStyle = '#000000';
