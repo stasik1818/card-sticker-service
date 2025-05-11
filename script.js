@@ -33,6 +33,8 @@ let translateY = 0;
 let scale = 1;
 let initialTranslateX = 0;
 let initialTranslateY = 0;
+let pinchStartDistance = 0;
+let pinchStartScale = 1;
 
 // Клик на кнопку отправки
 submitButton.addEventListener('click', submitImage);
@@ -61,15 +63,34 @@ imageUpload.addEventListener('change', function (e) {
     try {
       console.log('Файл прочитан');
       imagePreview.src = event.target.result;
-      scale = 1;
-      translateX = 0;
-      translateY = 0;
-      initialTranslateX = 0;
-      initialTranslateY = 0;
-      imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
-      imagePreview.style.transformOrigin = '0 0';
-      imagePreview.classList.add('loaded');
-      console.log('Картинка загружена в исходном виде, src установлен');
+      // Ждём загрузки изображения
+      imagePreview.onload = function() {
+        const frameRect = frame.getBoundingClientRect();
+        const frameWidth = frameRect.width;
+        const frameHeight = frameRect.height;
+        const imageWidth = imagePreview.naturalWidth;
+        const imageHeight = imagePreview.naturalHeight;
+        // Рассчитываем масштаб, чтобы изображение влезло в окно
+        let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight);
+        // Если изображение меньше окна, масштаб = 1
+        if (imageWidth <= frameWidth && imageHeight <= frameHeight) {
+          initialScale = 1;
+        }
+        // Центрируем изображение
+        const scaledWidth = imageWidth * initialScale;
+        const scaledHeight = imageHeight * initialScale;
+        let initialTranslateX = (frameWidth - scaledWidth) / 2;
+        let initialTranslateY = (frameHeight - scaledHeight) / 2;
+        // Устанавливаем глобальные переменные
+        translateX = initialTranslateX;
+        translateY = initialTranslateY;
+        scale = initialScale;
+        // Применяем трансформацию
+        imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+        imagePreview.style.transformOrigin = '0 0';
+        imagePreview.classList.add('loaded');
+        console.log('Картинка загружена и отмасштабирована, src установлен');
+      };
     } catch (error) {
       console.error('Ошибка с картинкой:', error);
       alert('Не могу загрузить фотку.');
@@ -97,14 +118,28 @@ imagePreview.addEventListener('mousedown', function (e) {
 // Тащим фотку пальцем
 imagePreview.addEventListener('touchstart', function (e) {
   e.preventDefault();
-  isDragging = true;
-  const touch = e.touches[0];
-  startX = touch.clientX;
-  startY = touch.clientY;
-  initialTranslateX = translateX;
-  initialTranslateY = translateY;
-  imagePreview.style.transition = 'none';
-  console.log('Начали тащить (сенсор)');
+  const touches = e.touches;
+  if (touches.length === 1) {
+    isDragging = true;
+    startX = touches[0].clientX;
+    startY = touches[0].clientY;
+    initialTranslateX = translateX;
+    initialTranslateY = translateY;
+    imagePreview.style.transition = 'none';
+    console.log('Начали тащить (сенсор, 1 палец)');
+  } else if (touches.length === 2) {
+    isDragging = false;
+    // Начало зума пальцами
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    pinchStartDistance = Math.sqrt(dx * dx + dy * dy);
+    pinchStartScale = scale;
+    // Центр между пальцами
+    const midX = (touches[0].clientX + touches[1].clientX) / 2 - frame.getBoundingClientRect().left;
+    const midY = (touches[0].clientY + touches[1].clientY) / 2 - frame.getBoundingClientRect().top;
+    imagePreview.style.transformOrigin = `${midX}px ${midY}px`;
+    console.log('Начали зум пальцами');
+  }
 });
 
 // Двигаем
@@ -119,13 +154,23 @@ document.addEventListener('mousemove', function (e) {
 });
 
 document.addEventListener('touchmove', function (e) {
-  if (isDragging) {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - startX;
-    const deltaY = touch.clientY - startY;
+  e.preventDefault();
+  const touches = e.touches;
+  if (touches.length === 1 && isDragging) {
+    const deltaX = touches[0].clientX - startX;
+    const deltaY = touches[0].clientY - startY;
     translateX = initialTranslateX + deltaX;
     translateY = initialTranslateY + deltaY;
+    imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+  } else if (touches.length === 2) {
+    // Зум пальцами
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const scaleChange = distance / pinchStartDistance;
+    scale = pinchStartScale * scaleChange;
+    scale = Math.min(Math.max(0.01, scale), 10);
+    console.log(`Зум пальцами: ${scale}`);
     imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
   }
 });
@@ -137,10 +182,13 @@ document.addEventListener('mouseup', function () {
   console.log('Отпустили (мышка)');
 });
 
-document.addEventListener('touchend', function () {
+document.addEventListener('touchend', function (e) {
   isDragging = false;
-  imagePreview.style.transition = 'transform 0.05s ease-out';
-  console.log('Отпустили (сенсор)');
+  if (e.touches.length < 2) {
+    imagePreview.style.transformOrigin = '0 0';
+    imagePreview.style.transition = 'transform 0.05s ease-out';
+    console.log('Отпустили (сенсор или конец зума пальцами)');
+  }
 });
 
 // Зум колесом от курсора
@@ -162,12 +210,12 @@ imagePreview.addEventListener('wheel', function (e) {
   // Обновляем масштаб
   const prevScale = scale;
   if (e.deltaY < 0) {
-    scale += 0.05; // Зум вперёд, меньший шаг
+    scale += 0.05; // Зум вперёд
   } else {
-    scale -= 0.05; // Зум назад, меньший шаг
+    scale -= 0.05; // Зум назад
   }
-  scale = Math.min(Math.max(0.01, scale), 25);
-  console.log(`Зум: ${scale}`);
+  scale = Math.min(Math.max(0.01, scale), 10);
+  console.log(`Зум колесом: ${scale}`);
 
   // Корректируем translate, чтобы компенсировать смещение из-за transform-origin
   translateX = mouseX - preZoomImageX * scale;
@@ -176,7 +224,7 @@ imagePreview.addEventListener('wheel', function (e) {
   // Применяем трансформацию
   imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
 
-  // Сбрасываем transform-origin после зума, чтобы не влиять на перетаскивание
+  // Сбрасываем transform-origin после зума
   imagePreview.style.transformOrigin = '0 0';
 });
 
@@ -285,7 +333,7 @@ async function submitImage() {
     formData.append('chat_id', CHAT_ID);
     formData.append('photo', blob, `cropped_image.${fileExtension}`);
 
-    const photoResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+    const photoResponse = await fetch(`[invalid url, do not cite]`, {
       method: 'POST',
       body: formData
     });
@@ -300,7 +348,7 @@ async function submitImage() {
     // Отправляем текст
     const text = `Имя: ${nameInput.value}\nКомментарий: ${commentInput.value || 'Без коммента'}\nКачество: ${qualitySelect.options[qualitySelect.selectedIndex].text}`;
     console.log('Кидаем текст в Telegram:', text);
-    const textResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    const textResponse = await fetch(`[invalid url, do not cite]`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -321,4 +369,4 @@ async function submitImage() {
     console.error('Ошибка при отправке:', error);
     alert('Чёт сломалось: ' + error.message);
   }
-}
+    }
