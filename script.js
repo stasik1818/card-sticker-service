@@ -45,6 +45,7 @@ imageUpload.addEventListener('change', function (e) {
   const file = e.target.files[0];
   if (!file) {
     console.log('Файл не выбран');
+    alert('Файл не выбран!');
     return;
   }
   if (file.size > 25 * 1024 * 1024) {
@@ -63,33 +64,56 @@ imageUpload.addEventListener('change', function (e) {
     try {
       console.log('Файл прочитан');
       imagePreview.src = event.target.result;
-      // Ждём загрузки изображения
-      imagePreview.onload = function() {
-        const frameRect = frame.getBoundingClientRect();
-        const frameWidth = frameRect.width;
-        const frameHeight = frameRect.height;
-        const imageWidth = imagePreview.naturalWidth;
-        const imageHeight = imagePreview.naturalHeight;
-        // Рассчитываем масштаб, чтобы изображение влезло в окно
-        let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight);
-        // Если изображение меньше окна, масштаб = 1
-        if (imageWidth <= frameWidth && imageHeight <= frameHeight) {
-          initialScale = 1;
+      imagePreview.onload = function () {
+        try {
+          const frameRect = frame.getBoundingClientRect();
+          if (!frameRect || frameRect.width === 0 || frameRect.height === 0) {
+            throw new Error('Не удалось определить размеры окна редактирования');
+          }
+          const frameWidth = frameRect.width;
+          const frameHeight = frameRect.height;
+          const imageWidth = imagePreview.naturalWidth;
+          const imageHeight = imagePreview.naturalHeight;
+
+          if (!imageWidth || !imageHeight) {
+            throw new Error('Не удалось определить размеры изображения');
+          }
+
+          console.log(`Размеры окна: ${frameWidth}x${frameHeight}`);
+          console.log(`Размеры изображения: ${imageWidth}x${imageHeight}`);
+
+          // Рассчитываем масштаб, чтобы изображение влезло в окно
+          let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight);
+          // Если изображение меньше окна, масштаб = 1
+          if (imageWidth <= frameWidth && imageHeight <= frameHeight) {
+            initialScale = 1;
+          }
+
+          // Центрируем изображение
+          const scaledWidth = imageWidth * initialScale;
+          const scaledHeight = imageHeight * initialScale;
+          let initialTranslateX = (frameWidth - scaledWidth) / 2;
+          let initialTranslateY = (frameHeight - scaledHeight) / 2;
+
+          // Устанавливаем глобальные переменные
+          translateX = initialTranslateX;
+          translateY = initialTranslateY;
+          scale = initialScale;
+
+          // Применяем трансформацию
+          imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+          imagePreview.style.transformOrigin = '0 0';
+          imagePreview.classList.add('loaded');
+          console.log(`Масштаб: ${scale}, Смещение: (${translateX}, ${translateY})`);
+          console.log('Картинка загружена и отмасштабирована');
+        } catch (error) {
+          console.error('Ошибка при масштабировании:', error);
+          alert('Ошибка при загрузке изображения: ' + error.message);
         }
-        // Центрируем изображение
-        const scaledWidth = imageWidth * initialScale;
-        const scaledHeight = imageHeight * initialScale;
-        let initialTranslateX = (frameWidth - scaledWidth) / 2;
-        let initialTranslateY = (frameHeight - scaledHeight) / 2;
-        // Устанавливаем глобальные переменные
-        translateX = initialTranslateX;
-        translateY = initialTranslateY;
-        scale = initialScale;
-        // Применяем трансформацию
-        imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
-        imagePreview.style.transformOrigin = '0 0';
-        imagePreview.classList.add('loaded');
-        console.log('Картинка загружена и отмасштабирована, src установлен');
+      };
+      imagePreview.onerror = function () {
+        console.error('Ошибка загрузки изображения');
+        alert('Не могу загрузить фотку.');
       };
     } catch (error) {
       console.error('Ошибка с картинкой:', error);
@@ -135,8 +159,9 @@ imagePreview.addEventListener('touchstart', function (e) {
     pinchStartDistance = Math.sqrt(dx * dx + dy * dy);
     pinchStartScale = scale;
     // Центр между пальцами
-    const midX = (touches[0].clientX + touches[1].clientX) / 2 - frame.getBoundingClientRect().left;
-    const midY = (touches[0].clientY + touches[1].clientY) / 2 - frame.getBoundingClientRect().top;
+    const rect = frame.getBoundingClientRect();
+    const midX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left;
+    const midY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top;
     imagePreview.style.transformOrigin = `${midX}px ${midY}px`;
     console.log('Начали зум пальцами');
   }
@@ -167,6 +192,7 @@ document.addEventListener('touchmove', function (e) {
     const dx = touches[0].clientX - touches[1].clientX;
     const dy = touches[0].clientY - touches[1].clientY;
     const distance = Math.sqrt(dx * dx + dy * dy);
+    if (pinchStartDistance === 0) return; // Защита от деления на ноль
     const scaleChange = distance / pinchStartDistance;
     scale = pinchStartScale * scaleChange;
     scale = Math.min(Math.max(0.01, scale), 10);
@@ -333,10 +359,28 @@ async function submitImage() {
     formData.append('chat_id', CHAT_ID);
     formData.append('photo', blob, `cropped_image.${fileExtension}`);
 
-    const photoResponse = await fetch(`[invalid url, do not cite]`, {
+    const photoResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
       method: 'POST',
       body: formData
     });
+
+    // Проверяем, что ответ корректный
+    if (!photoResponse.ok) {
+      const contentType = photoResponse.headers.get('content-type') || '';
+      let errorMessage = `Ошибка Telegram API (sendPhoto): HTTP ${photoResponse.status}`;
+      if (!contentType.includes('application/json')) {
+        const text = await photoResponse.text();
+        console.error('Ответ не JSON:', text);
+        errorMessage += ' - Сервер вернул HTML, проверь токен и chat_id';
+      } else {
+        const errorData = await photoResponse.json();
+        console.error('Ошибка Telegram API (sendPhoto):', errorData);
+        errorMessage += ` - ${errorData.description || 'Неизвестная ошибка'}`;
+      }
+      alert('Не могу отправить фотку: ' + errorMessage);
+      return;
+    }
+
     const photoResult = await photoResponse.json();
     if (!photoResult.ok) {
       console.error('Ошибка Telegram API (sendPhoto):', photoResult);
@@ -348,7 +392,7 @@ async function submitImage() {
     // Отправляем текст
     const text = `Имя: ${nameInput.value}\nКомментарий: ${commentInput.value || 'Без коммента'}\nКачество: ${qualitySelect.options[qualitySelect.selectedIndex].text}`;
     console.log('Кидаем текст в Telegram:', text);
-    const textResponse = await fetch(`[invalid url, do not cite]`, {
+    const textResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -356,6 +400,24 @@ async function submitImage() {
         text: text
       })
     });
+
+    // Проверяем, что ответ корректный
+    if (!textResponse.ok) {
+      const contentType = textResponse.headers.get('content-type') || '';
+      let errorMessage = `Ошибка Telegram API (sendMessage): HTTP ${textResponse.status}`;
+      if (!contentType.includes('application/json')) {
+        const text = await textResponse.text();
+        console.error('Ответ не JSON:', text);
+        errorMessage += ' - Сервер вернул HTML, проверь токен и chat_id';
+      } else {
+        const errorData = await textResponse.json();
+        console.error('Ошибка Telegram API (sendMessage):', errorData);
+        errorMessage += ` - ${errorData.description || 'Неизвестная ошибка'}`;
+      }
+      alert('Не могу отправить текст: ' + errorMessage);
+      return;
+    }
+
     const textResult = await textResponse.json();
     if (!textResult.ok) {
       console.error('Ошибка Telegram API (sendMessage):', textResult);
@@ -369,4 +431,4 @@ async function submitImage() {
     console.error('Ошибка при отправке:', error);
     alert('Чёт сломалось: ' + error.message);
   }
-    }
+}
