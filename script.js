@@ -242,49 +242,78 @@ async function submitImage() {
     return;
   }
 
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 1200; // Для печати (~350 DPI)
+  canvas.height = 757;
+
+  const frameRect = frame.getBoundingClientRect();
+  const imageRect = imagePreview.getBoundingClientRect();
+  const pixelRatio = window.devicePixelRatio || 1;
+
+  // Рассчитываем координаты области рамки относительно изображения
+  let sx = (-translateX) / scale;
+  let sy = (-translateY) / scale;
+  let sWidth = frameRect.width / scale;
+  let sHeight = frameRect.height / scale;
+
+  console.log('Координаты для обрезки:', { sx, sy, sWidth, sHeight, scale, pixelRatio, translateX, translateY });
+
+  const img = new Image();
+  img.src = imagePreview.src;
+
   try {
-    console.log('Захватываем рамку с помощью html2canvas');
-    const frame = document.getElementById('frame');
-    const frameRect = frame.getBoundingClientRect();
-    const canvas = await html2canvas(frame, {
-      width: frameRect.width,
-      height: frameRect.height,
-      scale: 1,
-      useCORS: true,
-      logging: true
+    await new Promise((resolve, reject) => {
+      img.onload = () => {
+        console.log('Фотка для canvas загружена', { naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
+        resolve();
+      };
+      img.onerror = () => {
+        console.error('Ошибка загрузки фотки для canvas');
+        reject(new Error('Ошибка загрузки фотки для обработки'));
+      };
     });
 
-    // Создаём итоговый canvas 1200x757
-    const finalCanvas = document.createElement('canvas');
-    const ctx = finalCanvas.getContext('2d');
-    finalCanvas.width = 1200;
-    finalCanvas.height = 757;
+    // Проверяем, что координаты не выходят за пределы изображения
+    sx = Math.max(0, Math.min(sx, img.naturalWidth - sWidth));
+    sy = Math.max(0, Math.min(sy, img.naturalHeight - sHeight));
+    sWidth = Math.min(sWidth, img.naturalWidth - sx);
+    sHeight = Math.min(sHeight, img.naturalHeight - sy);
+
+    console.log('Скорректированные координаты:', { sx, sy, sWidth, sHeight });
+
+    // Проверяем корректность координат
+    if (sWidth <= 0 || sHeight <= 0 || isNaN(sx) || isNaN(sy) || isNaN(sWidth) || isNaN(sHeight)) {
+      console.error('Некорректные размеры области:', { sx, sy, sWidth, sHeight });
+      alert('Ошибка: некорректная область изображения.');
+      return;
+    }
 
     // Рассчитываем пропорции для рендеринга
-    const sourceAspect = frameRect.width / frameRect.height;
-    const canvasAspect = finalCanvas.width / finalCanvas.height;
+    const sourceAspect = sWidth / sHeight;
+    const canvasAspect = canvas.width / canvas.height;
     let destWidth, destHeight, destX, destY;
 
     // Масштабируем, чтобы изображение влезло без растяжения
-    const scaleFactor = Math.min(finalCanvas.width / frameRect.width, finalCanvas.height / frameRect.height);
-    destWidth = frameRect.width * scaleFactor;
-    destHeight = frameRect.height * scaleFactor;
-    destX = (finalCanvas.width - destWidth) / 2;
-    destY = (finalCanvas.height - destHeight) / 2;
+    const scaleFactor = Math.min(canvas.width / sWidth, canvas.height / sHeight);
+    destWidth = sWidth * scaleFactor;
+    destHeight = sHeight * scaleFactor;
+    destX = (canvas.width - destWidth) / 2;
+    destY = (canvas.height - destHeight) / 2;
 
     console.log('Параметры рендеринга:', { destWidth, destHeight, destX, destY, scaleFactor, sourceAspect, canvasAspect });
 
     // Заполняем фон чёрным для letterbox
     ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Рисуем скруглённый прямоугольник и обрезаем
     const radius = 36; // Пропорционально разрешению
-    roundedRect(ctx, 0, 0, finalCanvas.width, finalCanvas.height, radius);
+    roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
     ctx.clip();
 
-    // Рисуем захваченное изображение
-    ctx.drawImage(canvas, 0, 0, frameRect.width, frameRect.height, destX, destY, destWidth, destHeight);
+    // Рисуем изображение
+    ctx.drawImage(img, sx, sy, sWidth, sHeight, destX, destY, destWidth, destHeight);
 
     // Определяем формат и качество
     const quality = qualitySelect.value;
@@ -319,7 +348,7 @@ async function submitImage() {
     // Конвертим в Blob
     const blob = await new Promise((resolve) => {
       console.log(`Конвертим canvas в Blob: ${mimeType}, качество: ${qualityValue || 'PNG'}`);
-      finalCanvas.toBlob(resolve, mimeType, qualityValue);
+      canvas.toBlob(resolve, mimeType, qualityValue);
     });
 
     if (!blob) {
