@@ -89,7 +89,7 @@ imageUpload.addEventListener('change', function (e) {
         imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
         imagePreview.style.transformOrigin = '0 0';
         imagePreview.classList.add('loaded');
-        console.log('Картинка загружена и отмасштабирована', { initialScale, translateX, translateY, imageWidth, imageHeight });
+        console.log('Картинка загружена и отмасштабирована, src установлен', { initialScale, translateX, translateY });
       };
     } catch (error) {
       console.error('Ошибка с картинкой:', error);
@@ -98,7 +98,7 @@ imageUpload.addEventListener('change', function (e) {
   };
   reader.onerror = function (error) {
     console.error('Ошибка чтения файла:', error);
-    alert('Ошибка при чтения файла.');
+    alert('Ошибка при чтении файла.');
   };
   reader.readAsDataURL(file);
   console.log('Читаем файл:', file.name);
@@ -191,7 +191,7 @@ document.addEventListener('touchend', function (e) {
   }
 });
 
-// Зум колесом
+// Зум колесом от курсора
 imagePreview.addEventListener('wheel', function (e) {
   e.preventDefault();
 
@@ -208,6 +208,7 @@ imagePreview.addEventListener('wheel', function (e) {
   const preZoomImageY = (mouseY - translateY) / scale;
 
   // Обновляем масштаб
+  const prevScale = scale;
   if (e.deltaY < 0) {
     scale += 0.05; // Зум вперёд
   } else {
@@ -243,27 +244,33 @@ async function submitImage() {
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  canvas.width = 1200;
+  canvas.width = 1200; // Для печати (~350 DPI)
   canvas.height = 757;
 
   const frameRect = frame.getBoundingClientRect();
-  const imageWidth = imagePreview.naturalWidth;
-  const imageHeight = imagePreview.naturalHeight;
+  const imageRect = imagePreview.getBoundingClientRect();
+  const pixelRatio = window.devicePixelRatio || 1;
 
-  // Рассчитываем координаты области рамки относительно изображения
-  let sx = (-translateX / scale) * (imageWidth / frameRect.width);
-  let sy = (-translateY / scale) * (imageHeight / frameRect.height);
-  let sWidth = (frameRect.width / scale) * (imageWidth / frameRect.width);
-  let sHeight = (frameRect.height / scale) * (imageHeight / frameRect.height);
+  // Рассчитываем координаты рамки относительно изображения
+  let sx = (frameRect.left - imageRect.left) / scale;
+  let sy = (frameRect.top - imageRect.top) / scale;
+  let sWidth = frameRect.width / scale;
+  let sHeight = frameRect.height / scale;
 
-  console.log('Координаты для обрезки:', { sx, sy, sWidth, sHeight, scale, translateX, translateY, frameWidth: frameRect.width, frameHeight: frameRect.height });
+  console.log('Координаты для обрезки:', { sx, sy, sWidth, sHeight, scale, pixelRatio });
+
+  // Проверяем корректность координат
+  if (sWidth <= 0 || sHeight <= 0 || isNaN(sx) || isNaN(sy) || isNaN(sWidth) || isNaN(sHeight)) {
+    console.error('Некорректные размеры области:', { sx, sy, sWidth, sHeight });
+    alert('Ошибка: некорректная область изображения.');
+    return;
+  }
 
   const img = new Image();
   img.src = imagePreview.src;
 
   try {
     await new Promise((resolve, reject) => {
-      img.crossOrigin = 'Anonymous';
       img.onload = () => {
         console.log('Фотка для canvas загружена', { naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
         resolve();
@@ -282,47 +289,33 @@ async function submitImage() {
 
     console.log('Скорректированные координаты:', { sx, sy, sWidth, sHeight });
 
-    // Проверяем корректность координат
-    if (sWidth <= 0 || sHeight <= 0 || isNaN(sx) || isNaN(sy) || isNaN(sWidth) || isNaN(sHeight)) {
-      console.error('Некорректные размеры области:', { sx, sy, sWidth, sHeight });
-      alert('Ошибка: некорректная область изображения.');
-      return;
-    }
-
     // Рассчитываем пропорции для рендеринга
     const sourceAspect = sWidth / sHeight;
     const canvasAspect = canvas.width / canvas.height;
     let destWidth, destHeight, destX, destY;
 
-    if (sourceAspect > canvasAspect) {
-      // Изображение шире, чем холст
-      destWidth = canvas.width;
-      destHeight = canvas.width / sourceAspect;
-      destX = 0;
-      destY = (canvas.height - destHeight) / 2;
-    } else {
-      // Изображение выше, чем холст
-      destHeight = canvas.height;
-      destWidth = canvas.height * sourceAspect;
-      destX = (canvas.width - destWidth) / 2;
-      destY = 0;
-    }
+    // Масштабируем, чтобы изображение влезло без растяжения
+    const scaleFactor = Math.min(canvas.width / sWidth, canvas.height / sHeight);
+    destWidth = sWidth * scaleFactor;
+    destHeight = sHeight * scaleFactor;
 
-    console.log('Параметры рендеринга:', { destWidth, destHeight, destX, destY, sourceAspect, canvasAspect });
+    // Центрируем изображение
+    destX = (canvas.width - destWidth) / 2;
+    destY = (canvas.height - destHeight) / 2;
+
+    console.log('Параметры рендеринга:', { destWidth, destHeight, destX, destY, scaleFactor });
 
     // Заполняем фон чёрным для letterbox
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Рисуем скруглённый прямоугольник и обрезаем
-    const radius = 36;
+    const radius = 36; // Пропорционально разрешению
     roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
     ctx.clip();
-
-    // Рисуем изображение
     ctx.drawImage(img, sx, sy, sWidth, sHeight, destX, destY, destWidth, destHeight);
 
-    // Определяем формат и качество
+    // Определяем формат и качество на основе выбора пользователя
     const quality = qualitySelect.value;
     let mimeType, qualityValue, fileExtension;
     switch (quality) {
@@ -343,7 +336,7 @@ async function submitImage() {
         break;
       case 'png':
         mimeType = 'image/png';
-        qualityValue = undefined;
+        qualityValue = undefined; // PNG без сжатия
         fileExtension = 'png';
         break;
       default:
@@ -352,7 +345,7 @@ async function submitImage() {
         fileExtension = 'jpg';
     }
 
-    // Конвертим в Blob
+    // Конвертим в Blob с выбранным качеством
     const blob = await new Promise((resolve) => {
       console.log(`Конвертим canvas в Blob: ${mimeType}, качество: ${qualityValue || 'PNG'}`);
       canvas.toBlob(resolve, mimeType, qualityValue);
@@ -368,7 +361,7 @@ async function submitImage() {
     const blobSizeKB = (blob.size / 1024).toFixed(2);
     console.log('Размер Blob:', blobSizeKB, 'KB');
     if (blob.size > 10 * 1024 * 1024) {
-      alert('Фотка слишком жирная для Telegram (больше 10 МБ). Попробуй JPEG с меньшим качеством.');
+      alert('Фотка слишком жирная для Telegram (больше 10 МБ). Попробуй JPEG с меньшим качеством или меньше зума.');
       console.log('Blob слишком большой:', blobSizeKB, 'KB');
       return;
     }
