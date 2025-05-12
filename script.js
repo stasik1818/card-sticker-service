@@ -217,9 +217,11 @@ async function submitImage() {
   const naturalWidth = imagePreview.naturalWidth;
   const naturalHeight = imagePreview.naturalHeight;
 
+  // Рассчитываем отображаемую высоту изображения
+  const displayedHeight = (naturalHeight / naturalWidth) * frameWidth;
   const baseScale = frameWidth / naturalWidth;
   const ox = frameWidth / 2;
-  const oy = frameHeight / 2;
+  const oy = displayedHeight / 2;
 
   let sx = (-translateX - ox * (1 - scale)) / (baseScale * scale);
   let sy = (-translateY - oy * (1 - scale)) / (baseScale * scale);
@@ -297,7 +299,7 @@ async function submitImage() {
     formData.append('chat_id', CHAT_ID);
     formData.append('photo', blob, `cropped_image.${fileExtension}`);
 
-    const photoResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+    const photoResponse = await fetch(`[invalid url, do not cite] {
       method: 'POST',
       body: formData
     });
@@ -311,7 +313,7 @@ async function submitImage() {
 
     const text = `Имя: ${nameInput.value}\nКомментарий: ${commentInput.value || 'Без коммента'}\nКачество: ${qualitySelect.options[qualitySelect.selectedIndex].text}`;
     console.log('Кидаем текст в Telegram:', text);
-    const textResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    const textResponse = await fetch(`[invalid url, do not cite] {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -332,4 +334,4 @@ async function submitImage() {
     console.error('Ошибка при отправке:', error);
     alert('Чёт сломалось: ' + error.message);
   }
-}
+    }
