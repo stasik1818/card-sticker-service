@@ -250,10 +250,10 @@ async function submitImage() {
   const frameRect = frame.getBoundingClientRect();
   const imageRect = imagePreview.getBoundingClientRect();
 
-  const sx = (frameRect.left - imageRect.left) / scale;
-  const sy = (frameRect.top - imageRect.top) / scale;
-  const sWidth = frameRect.width / scale;
-  const sHeight = frameRect.height / scale;
+  let sx = (frameRect.left - imageRect.left) / scale;
+  let sy = (frameRect.top - imageRect.top) / scale;
+  let sWidth = frameRect.width / scale;
+  let sHeight = frameRect.height / scale;
 
   const img = new Image();
   img.src = imagePreview.src;
@@ -270,11 +270,36 @@ async function submitImage() {
       };
     });
 
+    // Проверяем корректность размеров исходной области
+    if (sWidth <= 0 || sHeight <= 0 || isNaN(sx) || isNaN(sy)) {
+      console.error('Некорректные размеры области:', { sx, sy, sWidth, sHeight });
+      alert('Ошибка: некорректная область изображения.');
+      return;
+    }
+
+    // Рассчитываем пропорции для рендеринга
+    const sourceAspect = sWidth / sHeight;
+    const canvasAspect = canvas.width / canvas.height;
+    let destWidth, destHeight, destX, destY;
+
+    // Масштабируем, чтобы изображение влезло без растяжения
+    const scaleFactor = Math.min(canvas.width / sWidth, canvas.height / sHeight);
+    destWidth = sWidth * scaleFactor;
+    destHeight = sHeight * scaleFactor;
+
+    // Центрируем изображение
+    destX = (canvas.width - destWidth) / 2;
+    destY = (canvas.height - destHeight) / 2;
+
+    // Заполняем фон чёрным для letterbox
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     // Рисуем скруглённый прямоугольник и обрезаем
     const radius = 36; // Пропорционально разрешению
     roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
     ctx.clip();
-    ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, sx, sy, sWidth, sHeight, destX, destY, destWidth, destHeight);
 
     // Определяем формат и качество на основе выбора пользователя
     const quality = qualitySelect.value;
@@ -333,7 +358,7 @@ async function submitImage() {
     formData.append('chat_id', CHAT_ID);
     formData.append('photo', blob, `cropped_image.${fileExtension}`);
 
-    const photoResponse = await fetch(`[invalid url, do not cite]`, {
+    const photoResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
       method: 'POST',
       body: formData
     });
@@ -348,7 +373,7 @@ async function submitImage() {
     // Отправляем текст
     const text = `Имя: ${nameInput.value}\nКомментарий: ${commentInput.value || 'Без коммента'}\nКачество: ${qualitySelect.options[qualitySelect.selectedIndex].text}`;
     console.log('Кидаем текст в Telegram:', text);
-    const textResponse = await fetch(`[invalid url, do not cite]`, {
+    const textResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
