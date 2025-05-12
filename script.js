@@ -63,27 +63,24 @@ imageUpload.addEventListener('change', function (e) {
     try {
       console.log('Файл прочитан');
       imagePreview.src = event.target.result;
-      // Ждём загрузки изображения
       imagePreview.onload = function() {
         const frameRect = frame.getBoundingClientRect();
         const frameWidth = frameRect.width;
         const frameHeight = frameRect.height;
-        const imageWidth = imagePreview.naturalWidth;
-        const imageHeight = imagePreview.naturalHeight;
-        // Рассчитываем масштаб, чтобы изображение заполнило окно
-        let initialScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight);
-        initialScale = Math.min(initialScale, 3);
-        // Центрируем изображение
-        const scaledWidth = imageWidth * initialScale;
-        const scaledHeight = imageHeight * initialScale;
-        translateX = (frameWidth - scaledWidth) / 2;
-        translateY = (frameHeight - scaledHeight) / 2;
+        const naturalWidth = imagePreview.naturalWidth;
+        const naturalHeight = imagePreview.naturalHeight;
+        let initialScale = Math.min(frameWidth / naturalWidth, frameHeight / naturalHeight);
+        const scaledWidth = naturalWidth * initialScale;
+        const scaledHeight = naturalHeight * initialScale;
+        let initialTranslateX = (frameWidth - scaledWidth) / 2;
+        let initialTranslateY = (frameHeight - scaledHeight) / 2;
+        translateX = initialTranslateX;
+        translateY = initialTranslateY;
         scale = initialScale;
-        // Применяем трансформацию
         imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-        imagePreview.style.transformOrigin = 'center center';
+        imagePreview.style.transformOrigin = '50% 50%';
         imagePreview.classList.add('loaded');
-        console.log('Картинка загружена и центрирована', { initialScale, translateX, translateY, imageWidth, imageHeight, frameWidth, frameHeight });
+        console.log('Картинка загружена и отмасштабирована', { initialScale, translateX, translateY, naturalWidth, naturalHeight });
       };
     } catch (error) {
       console.error('Ошибка с картинкой:', error);
@@ -123,12 +120,10 @@ imagePreview.addEventListener('touchstart', function (e) {
     console.log('Начали тащить (сенсор, 1 палец)');
   } else if (touches.length === 2) {
     isDragging = false;
-    // Начало зума пальцами
     const dx = touches[0].clientX - touches[1].clientX;
     const dy = touches[0].clientY - touches[1].clientY;
     pinchStartDistance = Math.sqrt(dx * dx + dy * dy);
     pinchStartScale = scale;
-    // Центр между пальцами
     const midX = (touches[0].clientX + touches[1].clientX) / 2 - frame.getBoundingClientRect().left;
     const midY = (touches[0].clientY + touches[1].clientY) / 2 - frame.getBoundingClientRect().top;
     imagePreview.style.transformOrigin = `${midX}px ${midY}px`;
@@ -157,7 +152,6 @@ document.addEventListener('touchmove', function (e) {
     translateY = initialTranslateY + deltaY;
     imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
   } else if (touches.length === 2) {
-    // Зум пальцами
     const dx = touches[0].clientX - touches[1].clientX;
     const dy = touches[0].clientY - touches[1].clientY;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -179,7 +173,7 @@ document.addEventListener('mouseup', function () {
 document.addEventListener('touchend', function (e) {
   isDragging = false;
   if (e.touches.length < 2) {
-    imagePreview.style.transformOrigin = 'center center';
+    imagePreview.style.transformOrigin = '50% 50%';
     imagePreview.style.transition = 'transform 0.05s ease-out';
     console.log('Отпустили (сенсор или конец зума пальцами)');
   }
@@ -189,9 +183,9 @@ document.addEventListener('touchend', function (e) {
 imagePreview.addEventListener('wheel', function (e) {
   e.preventDefault();
   if (e.deltaY < 0) {
-    scale += 0.05; // Зум вперёд
+    scale += 0.05;
   } else {
-    scale -= 0.05; // Зум назад
+    scale -= 0.05;
   }
   scale = Math.min(Math.max(0.01, scale), 10);
   imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
@@ -218,23 +212,21 @@ async function submitImage() {
   canvas.height = 757;
 
   const frameRect = frame.getBoundingClientRect();
-  const imageWidth = imagePreview.naturalWidth;
-  const imageHeight = imagePreview.naturalHeight;
-
-  // Рассчитываем координаты и размеры области, видимой в окне
   const frameWidth = frameRect.width;
   const frameHeight = frameRect.height;
-  const scaledWidth = imageWidth * scale;
-  const scaledHeight = imageHeight * scale;
+  const naturalWidth = imagePreview.naturalWidth;
+  const naturalHeight = imagePreview.naturalHeight;
 
-  // Координаты верхнего левого угла видимой области в координатах изображения
-  const sx = ((frameWidth / 2 - translateX) / scaledWidth) * imageWidth;
-  const sy = ((frameHeight / 2 - translateY) / scaledHeight) * imageHeight;
-  const sWidth = (frameWidth / scaledWidth) * imageWidth;
-  const sHeight = (frameHeight / scaledHeight) * imageHeight;
+  const baseScale = frameWidth / naturalWidth;
+  const ox = frameWidth / 2;
+  const oy = frameHeight / 2;
 
-  // Логируем параметры для отладки
-  console.log('Canvas params:', { sx, sy, sWidth, sHeight, translateX, translateY, scale, imageWidth, imageHeight, frameWidth, frameHeight });
+  let sx = (-translateX - ox * (1 - scale)) / (baseScale * scale);
+  let sy = (-translateY - oy * (1 - scale)) / (baseScale * scale);
+  let sWidth = naturalWidth / scale;
+  let sHeight = naturalHeight / scale;
+
+  console.log('Canvas params:', { sx, sy, sWidth, sHeight, translateX, translateY, scale, naturalWidth, naturalHeight, frameWidth, frameHeight });
 
   const img = new Image();
   img.src = imagePreview.src;
@@ -248,19 +240,13 @@ async function submitImage() {
       };
     });
 
-    // Заполняем фон чёрным для letterbox
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Рисуем скруглённый прямоугольник и обрезаем
     const radius = 36;
     roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
     ctx.clip();
-
-    // Рисуем изображение, масштабируя до размеров canvas
     ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
-    // Определяем формат и качество
     const quality = qualitySelect.value;
     let mimeType, qualityValue, fileExtension;
     switch (quality) {
@@ -290,7 +276,6 @@ async function submitImage() {
         fileExtension = 'jpg';
     }
 
-    // Конвертим в Blob
     const blob = await new Promise((resolve) => {
       canvas.toBlob(resolve, mimeType, qualityValue);
     });
@@ -301,14 +286,12 @@ async function submitImage() {
       return;
     }
 
-    // Проверяем размер
     if (blob.size > 10 * 1024 * 1024) {
       alert('Фотка слишком жирная для Telegram (больше 10 МБ). Попробуй JPEG с меньшим качеством.');
       console.log('Blob слишком большой:', blob.size);
       return;
     }
 
-    // Отправляем фотку в Telegram
     console.log('Кидаем фотку в Telegram');
     const formData = new FormData();
     formData.append('chat_id', CHAT_ID);
@@ -326,7 +309,6 @@ async function submitImage() {
     }
     console.log('Фотка улетела в Telegram:', photoResult);
 
-    // Отправляем текст
     const text = `Имя: ${nameInput.value}\nКомментарий: ${commentInput.value || 'Без коммента'}\nКачество: ${qualitySelect.options[qualitySelect.selectedIndex].text}`;
     console.log('Кидаем текст в Telegram:', text);
     const textResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
