@@ -1,15 +1,15 @@
 console.log('Скрипт загружен!');
 
 // Точные размеры банковской карты в мм (стандарт ISO/IEC 7810)
-const CARD_WIDTH_MM = 85.60;
+const CARD_WIDTH_MM = 85.6;
 const CARD_HEIGHT_MM = 53.98;
 const CARD_RATIO = CARD_WIDTH_MM / CARD_HEIGHT_MM;
 
-// Точное позиционирование чипа (в мм от краев)
-const CHIP_X_MM = 6.3;    // от левого края
-const CHIP_Y_MM = 8.0;    // от верхнего края
-const CHIP_WIDTH_MM = 14.0;
-const CHIP_HEIGHT_MM = 12.0;
+// Точное позиционирование чипа согласно стандарту EMV
+const CHIP_X_MM = 7.0;    // от левого края
+const CHIP_Y_MM = 9.0;    // от верхнего края
+const CHIP_WIDTH_MM = 13.5;
+const CHIP_HEIGHT_MM = 11.0;
 
 // Рассчитываем пропорции чипа относительно карты
 const CHIP_POSITION = { 
@@ -18,6 +18,8 @@ const CHIP_POSITION = {
     width: CHIP_WIDTH_MM / CARD_WIDTH_MM,
     height: CHIP_HEIGHT_MM / CARD_HEIGHT_MM
 };
+
+console.log("Позиция чипа:", CHIP_POSITION);
 
 // Элементы страницы
 const imageUpload = document.getElementById('imageUpload');
@@ -58,12 +60,20 @@ function roundedRect(ctx, x, y, width, height, radius) {
     ctx.closePath();
 }
 
-// Функция для отрисовки реалистичного чипа
+// Функция для отрисовки реалистичного чипа с адаптацией к фону
 function drawChip(ctx, x, y, width, height, bgColor) {
-    // Основа чипа (золотой градиент)
+    // Определяем яркость фона
+    const brightness = (bgColor[0] * 299 + bgColor[1] * 587 + bgColor[2] * 114) / 1000;
+    const isLight = brightness > 128;
+    
+    // Основной цвет чипа (адаптивный золотой)
+    const mainColor = isLight ? '#d4af37' : '#e6c260';
+    const shadowColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.2)';
+    
+    // Основа чипа
     const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
-    gradient.addColorStop(0, '#e6c260');
-    gradient.addColorStop(1, '#d4af37');
+    gradient.addColorStop(0, lightenColor(mainColor, isLight ? -20 : 20));
+    gradient.addColorStop(1, darkenColor(mainColor, isLight ? 20 : -20));
     
     // Скругленные углы
     const cornerRadius = Math.min(width, height) * 0.15;
@@ -81,8 +91,8 @@ function drawChip(ctx, x, y, width, height, bgColor) {
     
     // Заливка и тень
     ctx.fillStyle = gradient;
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 4;
+    ctx.shadowColor = shadowColor;
+    ctx.shadowBlur = 6;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
     ctx.fill();
@@ -90,21 +100,34 @@ function drawChip(ctx, x, y, width, height, bgColor) {
     // Сброс теней
     ctx.shadowColor = 'transparent';
     
-    // Контакты (4 прямоугольника)
+    // Контакты (адаптивные к фону)
     const contactWidth = width * 0.08;
     const contactHeight = height * 0.5;
     const contactY = y + height * 0.25;
     const spacing = width * 0.05;
     
-    // Подстраиваем цвет контактов под фон
-    const isLight = bgColor[0] + bgColor[1] + bgColor[2] > 382; // 255*1.5
-    const contactColor = isLight ? '#333333' : '#cccccc';
-    
-    ctx.fillStyle = contactColor;
+    ctx.fillStyle = isLight ? '#333333' : '#cccccc';
     ctx.fillRect(x + spacing, contactY, contactWidth, contactHeight);
     ctx.fillRect(x + spacing*2 + contactWidth, contactY, contactWidth, contactHeight);
     ctx.fillRect(x + spacing*3 + contactWidth*2, contactY, contactWidth, contactHeight);
     ctx.fillRect(x + spacing*4 + contactWidth*3, contactY, contactWidth, contactHeight);
+}
+
+// Вспомогательные функции для работы с цветом
+function lightenColor(color, percent) {
+    const num = parseInt(color.slice(1), amt = Math.round(2.55 * percent);
+    const R = Math.min(255, (num >> 16) + amt);
+    const G = Math.min(255, (num >> 8 & 0x00FF) + amt);
+    const B = Math.min(255, (num & 0x0000FF) + amt);
+    return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
+}
+
+function darkenColor(color, percent) {
+    const num = parseInt(color.slice(1)), amt = Math.round(2.55 * percent);
+    const R = Math.max(0, (num >> 16) - amt);
+    const G = Math.max(0, (num >> 8 & 0x00FF) - amt);
+    const B = Math.max(0, (num & 0x0000FF) - amt);
+    return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
 }
 
 // Обновление размеров фрейма
@@ -132,7 +155,6 @@ function updateChipAndBorder() {
         canvas.width = 1;
         canvas.height = 1;
         
-        const frameRect = frame.getBoundingClientRect();
         const imgRect = imagePreview.getBoundingClientRect();
         
         const x = Math.max(0, Math.min(imgRect.width, translateX + frameRect.width * 0.5));
@@ -327,7 +349,7 @@ imagePreview.addEventListener('wheel', function (e) {
 
 // Получение цвета фона для чипа
 function getChipBackgroundColor(ctx, x, y, width, height) {
-    const sampleSize = 5;
+    const sampleSize = 7;
     const centerX = x + width / 2;
     const centerY = y + height / 2;
     
@@ -337,7 +359,7 @@ function getChipBackgroundColor(ctx, x, y, width, height) {
     tempCanvas.width = sampleSize;
     tempCanvas.height = sampleSize;
     
-    // Копируем область вокруг чипа
+    // Копируем область под чипом
     tempCtx.drawImage(
         ctx.canvas,
         centerX - sampleSize/2, centerY - sampleSize/2,
@@ -407,14 +429,14 @@ async function submitImage() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Рисуем скругленный прямоугольник
-        const radius = 36; // Пропорционально разрешению
+        const radius = 36;
         roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
         ctx.clip();
         
         // Рисуем изображение без искажений
         ctx.drawImage(img, 
-            sx, sy, sWidth, sHeight, // Область исходного изображения
-            0, 0, canvas.width, canvas.height // На весь canvas
+            sx, sy, sWidth, sHeight,
+            0, 0, canvas.width, canvas.height
         );
         
         // Определяем позицию чипа
