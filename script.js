@@ -1,8 +1,13 @@
 console.log('Скрипт загружен!');
 
-// Константы для карты
+// Константы для карты с точными размерами чипа
 const CARD_RATIO = 85.60 / 53.98;
-const CHIP_POSITION = { x: 0.12, y: 0.08, width: 0.15, height: 0.1 };
+const CHIP_POSITION = { 
+  x: 0.07,    // 6mm / 85.60mm (точная позиция слева)
+  y: 0.148,   // 8mm / 53.98mm (точная позиция сверху)
+  width: 0.187,  // 16mm / 85.60mm
+  height: 0.296  // 16mm / 53.98mm
+};
 
 // Элементы страницы
 const imageUpload = document.getElementById('imageUpload');
@@ -55,7 +60,7 @@ function updateFrameSize() {
 function updateChipAndBorder() {
   const frameRect = frame.getBoundingClientRect();
   
-  // Позиция чипа
+  // Позиция чипа с точными размерами
   chip.style.width = `${frameRect.width * CHIP_POSITION.width}px`;
   chip.style.height = `${frameRect.height * CHIP_POSITION.height}px`;
   chip.style.left = `${frameRect.width * CHIP_POSITION.x}px`;
@@ -94,33 +99,24 @@ window.addEventListener('resize', () => {
 
 // Загрузка изображения
 imageUpload.addEventListener('change', function (e) {
-  console.log('Выбрали файл');
   const file = e.target.files[0];
-  if (!file) {
-    console.log('Файл не выбран');
-    return;
-  }
+  if (!file) return;
   
-  // Проверка типа файла
   if (!file.type.match('image.*')) {
     alert('Пожалуйста, выберите изображение!');
-    console.log('Неправильный тип:', file.type);
     return;
   }
   
   if (file.size > 25 * 1024 * 1024) {
     alert('Файл слишком большой, максимум 25 МБ!');
-    console.log('Слишком большой файл:', file.size);
     return;
   }
 
   const reader = new FileReader();
   reader.onload = function (event) {
-    console.log('Файл прочитан');
     imagePreview.src = event.target.result;
     
     imagePreview.onload = function() {
-      console.log('Изображение загружено');
       const frameRect = frame.getBoundingClientRect();
       const imageWidth = imagePreview.naturalWidth;
       const imageHeight = imagePreview.naturalHeight;
@@ -150,11 +146,9 @@ imageUpload.addEventListener('change', function (e) {
       imagePreview.classList.add('loaded');
       
       updateChipAndBorder();
-      console.log('Изображение отмасштабировано');
     };
     
     imagePreview.onerror = function() {
-      console.error('Ошибка загрузки изображения');
       alert('Не удалось загрузить изображение');
     };
   };
@@ -165,7 +159,6 @@ imageUpload.addEventListener('change', function (e) {
   };
   
   reader.readAsDataURL(file);
-  console.log('Читаем файл:', file.name);
 });
 
 // Обработчики событий для перемещения и масштабирования
@@ -273,10 +266,23 @@ imagePreview.addEventListener('wheel', function (e) {
   updateChipAndBorder();
 });
 
+// Функция для отрисовки чипа на изображении
+function drawChip(ctx, x, y, width, height) {
+  // Основной цвет чипа
+  ctx.fillStyle = 'rgba(220, 220, 220, 0.7)';
+  ctx.fillRect(x, y, width, height);
+  
+  // Добавляем детали чипа
+  ctx.fillStyle = 'rgba(180, 180, 180, 0.9)';
+  ctx.fillRect(x + width * 0.2, y + height * 0.2, width * 0.6, height * 0.6);
+  
+  // Золотой контакт
+  ctx.fillStyle = 'rgba(212, 175, 55, 0.8)';
+  ctx.fillRect(x + width * 0.3, y + height * 0.7, width * 0.4, height * 0.15);
+}
+
 // Отправка данных
 async function submitImage() {
-  console.log('Нажата кнопка отправки');
-  
   if (!imagePreview.src || !imagePreview.classList.contains('loaded')) {
     alert('Пожалуйста, загрузите изображение!');
     return;
@@ -302,6 +308,7 @@ async function submitImage() {
 
   const img = new Image();
   img.src = imagePreview.src;
+  img.crossOrigin = 'anonymous';
   
   try {
     await new Promise((resolve, reject) => {
@@ -309,6 +316,9 @@ async function submitImage() {
       img.onerror = () => reject(new Error('Ошибка загрузки изображения'));
     });
 
+    // Сохраняем состояние контекста
+    ctx.save();
+    
     // Заполняем фон
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -329,6 +339,17 @@ async function submitImage() {
 
     // Рисуем изображение
     ctx.drawImage(img, sx, sy, sWidth, sHeight, destX, destY, destWidth, destHeight);
+    
+    // Рисуем чип на изображении
+    const chipX = destX + destWidth * CHIP_POSITION.x;
+    const chipY = destY + destHeight * CHIP_POSITION.y;
+    const chipWidth = destWidth * CHIP_POSITION.width;
+    const chipHeight = destHeight * CHIP_POSITION.height;
+    
+    drawChip(ctx, chipX, chipY, chipWidth, chipHeight);
+    
+    // Восстанавливаем состояние контекста
+    ctx.restore();
 
     // Конвертируем в нужный формат
     const quality = qualitySelect.value;
@@ -408,7 +429,6 @@ async function submitImage() {
     }
     
     alert('Заказ успешно отправлен!');
-    console.log('Данные отправлены');
     
   } catch (error) {
     console.error('Ошибка при отправке:', error);
