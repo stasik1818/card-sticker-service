@@ -37,13 +37,10 @@ const CHAT_ID = '1126053386';
 // Переменные для управления изображением
 let isDragging = false;
 let startX, startY;
-let translateX = 0;
-let translateY = 0;
+let offsetX = 0;
+let offsetY = 0;
 let scale = 1;
-let initialTranslateX = 0;
-let initialTranslateY = 0;
-let pinchStartDistance = 0;
-let pinchStartScale = 1;
+let minScale = 1;
 
 // Функция для скругленного прямоугольника
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -60,20 +57,12 @@ function roundedRect(ctx, x, y, width, height, radius) {
     ctx.closePath();
 }
 
-// Функция для отрисовки реалистичного чипа с адаптацией к фону
-function drawChip(ctx, x, y, width, height, bgColor) {
-    // Определяем яркость фона
-    const brightness = (bgColor[0] * 299 + bgColor[1] * 587 + bgColor[2] * 114) / 1000;
-    const isLight = brightness > 128;
-    
-    // Основной цвет чипа (адаптивный золотой)
-    const mainColor = isLight ? '#d4af37' : '#e6c260';
-    const shadowColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.2)';
-    
-    // Основа чипа
+// Функция для отрисовки реалистичного чипа
+function drawChip(ctx, x, y, width, height) {
+    // Основа чипа (золотой градиент)
     const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
-    gradient.addColorStop(0, lightenColor(mainColor, isLight ? -20 : 20));
-    gradient.addColorStop(1, darkenColor(mainColor, isLight ? 20 : -20));
+    gradient.addColorStop(0, '#e6c260');
+    gradient.addColorStop(1, '#d4af37');
     
     // Скругленные углы
     const cornerRadius = Math.min(width, height) * 0.15;
@@ -91,8 +80,8 @@ function drawChip(ctx, x, y, width, height, bgColor) {
     
     // Заливка и тень
     ctx.fillStyle = gradient;
-    ctx.shadowColor = shadowColor;
-    ctx.shadowBlur = 6;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 4;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
     ctx.fill();
@@ -100,34 +89,17 @@ function drawChip(ctx, x, y, width, height, bgColor) {
     // Сброс теней
     ctx.shadowColor = 'transparent';
     
-    // Контакты (адаптивные к фону)
+    // Контакты (4 прямоугольника)
     const contactWidth = width * 0.08;
     const contactHeight = height * 0.5;
     const contactY = y + height * 0.25;
     const spacing = width * 0.05;
     
-    ctx.fillStyle = isLight ? '#333333' : '#cccccc';
+    ctx.fillStyle = '#333333';
     ctx.fillRect(x + spacing, contactY, contactWidth, contactHeight);
     ctx.fillRect(x + spacing*2 + contactWidth, contactY, contactWidth, contactHeight);
     ctx.fillRect(x + spacing*3 + contactWidth*2, contactY, contactWidth, contactHeight);
     ctx.fillRect(x + spacing*4 + contactWidth*3, contactY, contactWidth, contactHeight);
-}
-
-// Вспомогательные функции для работы с цветом
-function lightenColor(color, percent) {
-    const num = parseInt(color.slice(1), amt = Math.round(2.55 * percent);
-    const R = Math.min(255, (num >> 16) + amt);
-    const G = Math.min(255, (num >> 8 & 0x00FF) + amt);
-    const B = Math.min(255, (num & 0x0000FF) + amt);
-    return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
-}
-
-function darkenColor(color, percent) {
-    const num = parseInt(color.slice(1)), amt = Math.round(2.55 * percent);
-    const R = Math.max(0, (num >> 16) - amt);
-    const G = Math.max(0, (num >> 8 & 0x00FF) - amt);
-    const B = Math.max(0, (num & 0x0000FF) - amt);
-    return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
 }
 
 // Обновление размеров фрейма
@@ -136,6 +108,11 @@ function updateFrameSize() {
     const frameHeight = containerWidth / CARD_RATIO;
     frame.style.width = `${containerWidth}px`;
     frame.style.height = `${frameHeight}px`;
+    
+    // Центрируем изображение при изменении размеров
+    if (imagePreview.src && imagePreview.classList.contains('loaded')) {
+        positionImage();
+    }
 }
 
 // Обновление чипа и рамки
@@ -147,25 +124,40 @@ function updateChipAndBorder() {
     chip.style.height = `${frameRect.height * CHIP_POSITION.height}px`;
     chip.style.left = `${frameRect.width * CHIP_POSITION.x}px`;
     chip.style.top = `${frameRect.height * CHIP_POSITION.y}px`;
+}
 
-    // Автоматический цвет рамки
-    if (imagePreview.src && imagePreview.classList.contains('loaded')) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = 1;
-        canvas.height = 1;
-        
-        const imgRect = imagePreview.getBoundingClientRect();
-        
-        const x = Math.max(0, Math.min(imgRect.width, translateX + frameRect.width * 0.5));
-        const y = Math.max(0, Math.min(imgRect.height, translateY + frameRect.height * 0.5));
-        
-        ctx.drawImage(imagePreview, x, y, 1, 1, 0, 0, 1, 1);
-        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
-        frame.style.borderColor = luminance > 128 ? 
-            'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)';
+// Позиционирование изображения
+function positionImage() {
+    const frameRect = frame.getBoundingClientRect();
+    const imgWidth = imagePreview.naturalWidth;
+    const imgHeight = imagePreview.naturalHeight;
+    
+    // Рассчитываем начальный масштаб
+    minScale = Math.min(
+        frameRect.width / imgWidth, 
+        frameRect.height / imgHeight
+    );
+    
+    // Если изображение меньше рамки
+    if (imgWidth <= frameRect.width && imgHeight <= frameRect.height) {
+        minScale = 1;
     }
+    
+    scale = minScale;
+    
+    // Центрируем изображение
+    offsetX = (frameRect.width - imgWidth * scale) / 2;
+    offsetY = (frameRect.height - imgHeight * scale) / 2;
+    
+    applyTransform();
+}
+
+// Применение трансформации
+function applyTransform() {
+    imagePreview.style.transform = `
+        translate(${offsetX}px, ${offsetY}px) 
+        scale(${scale})
+    `;
 }
 
 // Инициализация размеров
@@ -198,34 +190,8 @@ imageUpload.addEventListener('change', function (e) {
         imagePreview.src = event.target.result;
         
         imagePreview.onload = function() {
-            const frameRect = frame.getBoundingClientRect();
-            const imageWidth = imagePreview.naturalWidth;
-            const imageHeight = imagePreview.naturalHeight;
-            
-            // Рассчитываем начальный масштаб
-            let initialScale = Math.min(
-                frameRect.width / imageWidth, 
-                frameRect.height / imageHeight
-            );
-            
-            // Если изображение меньше рамки
-            if (imageWidth <= frameRect.width && imageHeight <= frameRect.height) {
-                initialScale = 1;
-            }
-
-            // Центрируем изображение
-            translateX = (frameRect.width - imageWidth * initialScale) / 2;
-            translateY = (frameRect.height - imageHeight * initialScale) / 2;
-            scale = initialScale;
-
-            // Применяем трансформацию
-            imagePreview.style.transform = `
-                translate(${translateX}px, ${translateY}px) 
-                scale(${scale})
-            `;
-            imagePreview.style.transformOrigin = '0 0';
             imagePreview.classList.add('loaded');
-            
+            positionImage();
             updateChipAndBorder();
         };
         
@@ -247,8 +213,6 @@ imagePreview.addEventListener('mousedown', function (e) {
     isDragging = true;
     startX = e.clientX;
     startY = e.clientY;
-    initialTranslateX = translateX;
-    initialTranslateY = translateY;
     imagePreview.style.transition = 'none';
 });
 
@@ -259,18 +223,7 @@ imagePreview.addEventListener('touchstart', function (e) {
         isDragging = true;
         startX = touches[0].clientX;
         startY = touches[0].clientY;
-        initialTranslateX = translateX;
-        initialTranslateY = translateY;
         imagePreview.style.transition = 'none';
-    } else if (touches.length === 2) {
-        isDragging = false;
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        pinchStartDistance = Math.sqrt(dx * dx + dy * dy);
-        pinchStartScale = scale;
-        const midX = (touches[0].clientX + touches[1].clientX) / 2 - frame.getBoundingClientRect().left;
-        const midY = (touches[0].clientY + touches[1].clientY) / 2 - frame.getBoundingClientRect().top;
-        imagePreview.style.transformOrigin = `${midX}px ${midY}px`;
     }
 });
 
@@ -278,10 +231,13 @@ document.addEventListener('mousemove', function (e) {
     if (isDragging) {
         const deltaX = e.clientX - startX;
         const deltaY = e.clientY - startY;
-        translateX = initialTranslateX + deltaX;
-        translateY = initialTranslateY + deltaY;
-        imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-        updateChipAndBorder();
+        startX = e.clientX;
+        startY = e.clientY;
+        
+        offsetX += deltaX;
+        offsetY += deltaY;
+        
+        applyTransform();
     }
 });
 
@@ -291,31 +247,24 @@ document.addEventListener('touchmove', function (e) {
     if (touches.length === 1 && isDragging) {
         const deltaX = touches[0].clientX - startX;
         const deltaY = touches[0].clientY - startY;
-        translateX = initialTranslateX + deltaX;
-        translateY = initialTranslateY + deltaY;
-        imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-        updateChipAndBorder();
-    } else if (touches.length === 2) {
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const scaleChange = distance / pinchStartDistance;
-        scale = pinchStartScale * scaleChange;
-        scale = Math.min(Math.max(0.1, scale), 10);
-        imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-        updateChipAndBorder();
+        startX = touches[0].clientX;
+        startY = touches[0].clientY;
+        
+        offsetX += deltaX;
+        offsetY += deltaY;
+        
+        applyTransform();
     }
 });
 
 document.addEventListener('mouseup', function () {
     isDragging = false;
-    imagePreview.style.transition = 'transform 0.05s ease-out';
+    imagePreview.style.transition = 'transform 0.1s ease-out';
 });
 
 document.addEventListener('touchend', function () {
     isDragging = false;
-    imagePreview.style.transformOrigin = '0 0';
-    imagePreview.style.transition = 'transform 0.05s ease-out';
+    imagePreview.style.transition = 'transform 0.1s ease-out';
 });
 
 imagePreview.addEventListener('wheel', function (e) {
@@ -325,65 +274,23 @@ imagePreview.addEventListener('wheel', function (e) {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    imagePreview.style.transformOrigin = `${mouseX}px ${mouseY}px`;
-
-    const preZoomImageX = (mouseX - translateX) / scale;
-    const preZoomImageY = (mouseY - translateY) / scale;
-
     const prevScale = scale;
+    
     if (e.deltaY < 0) {
-        scale += 0.05;
+        scale *= 1.1; // Увеличение
     } else {
-        scale -= 0.05;
+        scale *= 0.9; // Уменьшение
     }
-    scale = Math.min(Math.max(0.1, scale), 10);
-
-    translateX = mouseX - preZoomImageX * scale;
-    translateY = mouseY - preZoomImageY * scale;
-
-    imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-    imagePreview.style.transformOrigin = '0 0';
     
-    updateChipAndBorder();
+    // Ограничиваем масштаб
+    scale = Math.max(minScale, Math.min(scale, 10));
+    
+    // Корректируем смещение для сохранения позиции под курсором
+    offsetX = mouseX - (mouseX - offsetX) * (scale / prevScale);
+    offsetY = mouseY - (mouseY - offsetY) * (scale / prevScale);
+    
+    applyTransform();
 });
-
-// Получение цвета фона для чипа
-function getChipBackgroundColor(ctx, x, y, width, height) {
-    const sampleSize = 7;
-    const centerX = x + width / 2;
-    const centerY = y + height / 2;
-    
-    // Создаем временный canvas для анализа цвета
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = sampleSize;
-    tempCanvas.height = sampleSize;
-    
-    // Копируем область под чипом
-    tempCtx.drawImage(
-        ctx.canvas,
-        centerX - sampleSize/2, centerY - sampleSize/2,
-        sampleSize, sampleSize,
-        0, 0, sampleSize, sampleSize
-    );
-    
-    // Анализируем средний цвет
-    const data = tempCtx.getImageData(0, 0, sampleSize, sampleSize).data;
-    let r = 0, g = 0, b = 0;
-    
-    for (let i = 0; i < data.length; i += 4) {
-        r += data[i];
-        g += data[i+1];
-        b += data[i+2];
-    }
-    
-    const count = data.length / 4;
-    return [
-        Math.round(r / count),
-        Math.round(g / count),
-        Math.round(b / count)
-    ];
-}
 
 // Отправка данных
 async function submitImage() {
@@ -407,13 +314,15 @@ async function submitImage() {
     canvas.height = cropHeight;
 
     const frameRect = frame.getBoundingClientRect();
+    const imgRect = imagePreview.getBoundingClientRect();
     
-    // Рассчитываем область кадрирования в координатах исходного изображения
-    const sx = -translateX / scale;
-    const sy = -translateY / scale;
-    const sWidth = frameRect.width / scale;
-    const sHeight = frameRect.height / scale;
-
+    // Рассчитываем видимую область изображения
+    const visibleWidth = frameRect.width / scale;
+    const visibleHeight = frameRect.height / scale;
+    
+    const sx = -offsetX / scale;
+    const sy = -offsetY / scale;
+    
     const img = new Image();
     img.src = imagePreview.src;
     img.crossOrigin = 'anonymous';
@@ -435,8 +344,10 @@ async function submitImage() {
         
         // Рисуем изображение без искажений
         ctx.drawImage(img, 
-            sx, sy, sWidth, sHeight,
-            0, 0, canvas.width, canvas.height
+            sx, sy, 
+            visibleWidth, visibleHeight,
+            0, 0,
+            canvas.width, canvas.height
         );
         
         // Определяем позицию чипа
@@ -445,11 +356,8 @@ async function submitImage() {
         const chipWidth = canvas.width * CHIP_POSITION.width;
         const chipHeight = canvas.height * CHIP_POSITION.height;
         
-        // Получаем цвет фона для адаптации чипа
-        const bgColor = getChipBackgroundColor(ctx, chipX, chipY, chipWidth, chipHeight);
-        
-        // Рисуем чип с адаптацией под фон
-        drawChip(ctx, chipX, chipY, chipWidth, chipHeight, bgColor);
+        // Рисуем чип
+        drawChip(ctx, chipX, chipY, chipWidth, chipHeight);
 
         // Конвертируем в нужный формат
         const quality = qualitySelect.value;
