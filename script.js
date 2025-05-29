@@ -41,6 +41,8 @@ let offsetX = 0;
 let offsetY = 0;
 let scale = 1;
 let minScale = 1;
+let imageWidth = 0;
+let imageHeight = 0;
 
 // Функция для скругленного прямоугольника
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -105,12 +107,12 @@ function drawChip(ctx, x, y, width, height) {
 // Обновление размеров фрейма
 function updateFrameSize() {
     const containerWidth = Math.min(428, window.innerWidth * 0.9);
-    const frameHeight = containerWidth / CARD_RATIO;
+    const frameHeight = Math.round(containerWidth / CARD_RATIO);
     frame.style.width = `${containerWidth}px`;
     frame.style.height = `${frameHeight}px`;
     
     // Центрируем изображение при изменении размеров
-    if (imagePreview.src && imagePreview.classList.contains('loaded')) {
+    if (imagePreview.classList.contains('loaded')) {
         positionImage();
     }
 }
@@ -120,44 +122,44 @@ function updateChipAndBorder() {
     const frameRect = frame.getBoundingClientRect();
     
     // Позиция чипа с точными размерами
-    chip.style.width = `${frameRect.width * CHIP_POSITION.width}px`;
-    chip.style.height = `${frameRect.height * CHIP_POSITION.height}px`;
-    chip.style.left = `${frameRect.width * CHIP_POSITION.x}px`;
-    chip.style.top = `${frameRect.height * CHIP_POSITION.y}px`;
+    const chipWidth = Math.round(frameRect.width * CHIP_POSITION.width);
+    const chipHeight = Math.round(frameRect.height * CHIP_POSITION.height);
+    const chipLeft = Math.round(frameRect.width * CHIP_POSITION.x);
+    const chipTop = Math.round(frameRect.height * CHIP_POSITION.y);
+    
+    chip.style.width = `${chipWidth}px`;
+    chip.style.height = `${chipHeight}px`;
+    chip.style.left = `${chipLeft}px`;
+    chip.style.top = `${chipTop}px`;
 }
 
 // Позиционирование изображения
 function positionImage() {
     const frameRect = frame.getBoundingClientRect();
-    const imgWidth = imagePreview.naturalWidth;
-    const imgHeight = imagePreview.naturalHeight;
     
     // Рассчитываем начальный масштаб
     minScale = Math.min(
-        frameRect.width / imgWidth, 
-        frameRect.height / imgHeight
+        frameRect.width / imageWidth, 
+        frameRect.height / imageHeight
     );
     
     // Если изображение меньше рамки
-    if (imgWidth <= frameRect.width && imgHeight <= frameRect.height) {
+    if (imageWidth <= frameRect.width && imageHeight <= frameRect.height) {
         minScale = 1;
     }
     
     scale = minScale;
     
     // Центрируем изображение
-    offsetX = (frameRect.width - imgWidth * scale) / 2;
-    offsetY = (frameRect.height - imgHeight * scale) / 2;
+    offsetX = (frameRect.width - imageWidth * scale) / 2;
+    offsetY = (frameRect.height - imageHeight * scale) / 2;
     
     applyTransform();
 }
 
 // Применение трансформации
 function applyTransform() {
-    imagePreview.style.transform = `
-        translate(${offsetX}px, ${offsetY}px) 
-        scale(${scale})
-    `;
+    imagePreview.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
 }
 
 // Инициализация размеров
@@ -190,6 +192,8 @@ imageUpload.addEventListener('change', function (e) {
         imagePreview.src = event.target.result;
         
         imagePreview.onload = function() {
+            imageWidth = imagePreview.naturalWidth;
+            imageHeight = imagePreview.naturalHeight;
             imagePreview.classList.add('loaded');
             positionImage();
             updateChipAndBorder();
@@ -270,7 +274,7 @@ document.addEventListener('touchend', function () {
 imagePreview.addEventListener('wheel', function (e) {
     e.preventDefault();
 
-    const rect = imagePreview.getBoundingClientRect();
+    const rect = frame.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
@@ -314,7 +318,6 @@ async function submitImage() {
     canvas.height = cropHeight;
 
     const frameRect = frame.getBoundingClientRect();
-    const imgRect = imagePreview.getBoundingClientRect();
     
     // Рассчитываем видимую область изображения
     const visibleWidth = frameRect.width / scale;
@@ -325,7 +328,6 @@ async function submitImage() {
     
     const img = new Image();
     img.src = imagePreview.src;
-    img.crossOrigin = 'anonymous';
     
     try {
         await new Promise((resolve, reject) => {
@@ -343,7 +345,8 @@ async function submitImage() {
         ctx.clip();
         
         // Рисуем изображение без искажений
-        ctx.drawImage(img, 
+        ctx.drawImage(
+            img, 
             sx, sy, 
             visibleWidth, visibleHeight,
             0, 0,
