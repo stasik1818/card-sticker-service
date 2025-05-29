@@ -59,7 +59,7 @@ function roundedRect(ctx, x, y, width, height, radius) {
 }
 
 // Функция для отрисовки реалистичного чипа
-function drawChip(ctx, x, y, width, height) {
+function drawChip(ctx, x, y, width, height, bgColor) {
     // Основа чипа (золотой градиент)
     const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
     gradient.addColorStop(0, '#e6c260');
@@ -96,7 +96,11 @@ function drawChip(ctx, x, y, width, height) {
     const contactY = y + height * 0.25;
     const spacing = width * 0.05;
     
-    ctx.fillStyle = '#333333';
+    // Подстраиваем цвет контактов под фон
+    const isLight = bgColor[0] + bgColor[1] + bgColor[2] > 382; // 255*1.5
+    const contactColor = isLight ? '#333333' : '#cccccc';
+    
+    ctx.fillStyle = contactColor;
     ctx.fillRect(x + spacing, contactY, contactWidth, contactHeight);
     ctx.fillRect(x + spacing*2 + contactWidth, contactY, contactWidth, contactHeight);
     ctx.fillRect(x + spacing*3 + contactWidth*2, contactY, contactWidth, contactHeight);
@@ -321,6 +325,44 @@ imagePreview.addEventListener('wheel', function (e) {
     updateChipAndBorder();
 });
 
+// Получение цвета фона для чипа
+function getChipBackgroundColor(ctx, x, y, width, height) {
+    const sampleSize = 5;
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    
+    // Создаем временный canvas для анализа цвета
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = sampleSize;
+    tempCanvas.height = sampleSize;
+    
+    // Копируем область вокруг чипа
+    tempCtx.drawImage(
+        ctx.canvas,
+        centerX - sampleSize/2, centerY - sampleSize/2,
+        sampleSize, sampleSize,
+        0, 0, sampleSize, sampleSize
+    );
+    
+    // Анализируем средний цвет
+    const data = tempCtx.getImageData(0, 0, sampleSize, sampleSize).data;
+    let r = 0, g = 0, b = 0;
+    
+    for (let i = 0; i < data.length; i += 4) {
+        r += data[i];
+        g += data[i+1];
+        b += data[i+2];
+    }
+    
+    const count = data.length / 4;
+    return [
+        Math.round(r / count),
+        Math.round(g / count),
+        Math.round(b / count)
+    ];
+}
+
 // Отправка данных
 async function submitImage() {
     if (!imagePreview.src || !imagePreview.classList.contains('loaded')) {
@@ -336,7 +378,7 @@ async function submitImage() {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
-    // Фиксированный размер области кадрирования в пикселях (высокое разрешение)
+    // Фиксированный размер области кадрирования в пикселях
     const cropWidth = 1200;
     const cropHeight = Math.round(cropWidth / CARD_RATIO);
     canvas.width = cropWidth;
@@ -360,9 +402,6 @@ async function submitImage() {
             img.onerror = () => reject(new Error('Ошибка загрузки изображения'));
         });
 
-        // Сохраняем состояние контекста
-        ctx.save();
-        
         // Заполняем фон
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -372,22 +411,23 @@ async function submitImage() {
         roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
         ctx.clip();
         
-        // Рисуем изображение
+        // Рисуем изображение без искажений
         ctx.drawImage(img, 
             sx, sy, sWidth, sHeight, // Область исходного изображения
             0, 0, canvas.width, canvas.height // На весь canvas
         );
         
-        // Рисуем чип на изображении
+        // Определяем позицию чипа
         const chipX = canvas.width * CHIP_POSITION.x;
         const chipY = canvas.height * CHIP_POSITION.y;
         const chipWidth = canvas.width * CHIP_POSITION.width;
         const chipHeight = canvas.height * CHIP_POSITION.height;
         
-        drawChip(ctx, chipX, chipY, chipWidth, chipHeight);
+        // Получаем цвет фона для адаптации чипа
+        const bgColor = getChipBackgroundColor(ctx, chipX, chipY, chipWidth, chipHeight);
         
-        // Восстанавливаем состояние контекста
-        ctx.restore();
+        // Рисуем чип с адаптацией под фон
+        drawChip(ctx, chipX, chipY, chipWidth, chipHeight, bgColor);
 
         // Конвертируем в нужный формат
         const quality = qualitySelect.value;
