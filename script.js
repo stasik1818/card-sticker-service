@@ -1,12 +1,22 @@
 console.log('Скрипт загружен!');
 
-// Точные пропорции чипа на банковской карте (стандарт ISO/IEC 7810)
-const CARD_RATIO = 85.60 / 53.98;
+// Точные размеры банковской карты в мм (стандарт ISO/IEC 7810)
+const CARD_WIDTH_MM = 85.60;
+const CARD_HEIGHT_MM = 53.98;
+const CARD_RATIO = CARD_WIDTH_MM / CARD_HEIGHT_MM;
+
+// Точное позиционирование чипа (в мм от краев)
+const CHIP_X_MM = 6.3;    // от левого края
+const CHIP_Y_MM = 8.0;    // от верхнего края
+const CHIP_WIDTH_MM = 14.0;
+const CHIP_HEIGHT_MM = 12.0;
+
+// Рассчитываем пропорции чипа относительно карты
 const CHIP_POSITION = { 
-    x: 0.073,  // 6.3mm / 85.60mm (точное положение от левого края)
-    y: 0.148,  // 8mm / 53.98mm (точное положение от верхнего края)
-    width: 0.164,  // 14mm / 85.60mm
-    height: 0.222  // 12mm / 53.98mm
+    x: CHIP_X_MM / CARD_WIDTH_MM,
+    y: CHIP_Y_MM / CARD_HEIGHT_MM,
+    width: CHIP_WIDTH_MM / CARD_WIDTH_MM,
+    height: CHIP_HEIGHT_MM / CARD_HEIGHT_MM
 };
 
 // Элементы страницы
@@ -184,7 +194,7 @@ imageUpload.addEventListener('change', function (e) {
 
             // Применяем трансформацию
             imagePreview.style.transform = `
-                translate3d(${translateX}px, ${translateY}px, 0) 
+                translate(${translateX}px, ${translateY}px) 
                 scale(${scale})
             `;
             imagePreview.style.transformOrigin = '0 0';
@@ -244,7 +254,7 @@ document.addEventListener('mousemove', function (e) {
         const deltaY = e.clientY - startY;
         translateX = initialTranslateX + deltaX;
         translateY = initialTranslateY + deltaY;
-        imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+        imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
         updateChipAndBorder();
     }
 });
@@ -257,7 +267,7 @@ document.addEventListener('touchmove', function (e) {
         const deltaY = touches[0].clientY - startY;
         translateX = initialTranslateX + deltaX;
         translateY = initialTranslateY + deltaY;
-        imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+        imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
         updateChipAndBorder();
     } else if (touches.length === 2) {
         const dx = touches[0].clientX - touches[1].clientX;
@@ -266,7 +276,7 @@ document.addEventListener('touchmove', function (e) {
         const scaleChange = distance / pinchStartDistance;
         scale = pinchStartScale * scaleChange;
         scale = Math.min(Math.max(0.1, scale), 10);
-        imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+        imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
         updateChipAndBorder();
     }
 });
@@ -305,7 +315,7 @@ imagePreview.addEventListener('wheel', function (e) {
     translateX = mouseX - preZoomImageX * scale;
     translateY = mouseY - preZoomImageY * scale;
 
-    imagePreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+    imagePreview.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
     imagePreview.style.transformOrigin = '0 0';
     
     updateChipAndBorder();
@@ -325,14 +335,18 @@ async function submitImage() {
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    canvas.width = 1200;
-    canvas.height = 757;
+    
+    // Фиксированный размер области кадрирования в пикселях (высокое разрешение)
+    const cropWidth = 1200;
+    const cropHeight = Math.round(cropWidth / CARD_RATIO);
+    canvas.width = cropWidth;
+    canvas.height = cropHeight;
 
     const frameRect = frame.getBoundingClientRect();
-    const imgRect = imagePreview.getBoundingClientRect();
     
-    const sx = (frameRect.left - imgRect.left) / scale;
-    const sy = (frameRect.top - imgRect.top) / scale;
+    // Рассчитываем область кадрирования в координатах исходного изображения
+    const sx = -translateX / scale;
+    const sy = -translateY / scale;
     const sWidth = frameRect.width / scale;
     const sHeight = frameRect.height / scale;
 
@@ -354,27 +368,21 @@ async function submitImage() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Рисуем скругленный прямоугольник
-        roundedRect(ctx, 0, 0, canvas.width, canvas.height, 36);
+        const radius = 36; // Пропорционально разрешению
+        roundedRect(ctx, 0, 0, canvas.width, canvas.height, radius);
         ctx.clip();
         
-        // Рассчитываем размеры для рисования
-        const scaleFactor = Math.min(
-            canvas.width / sWidth, 
-            canvas.height / sHeight
-        );
-        const destWidth = sWidth * scaleFactor;
-        const destHeight = sHeight * scaleFactor;
-        const destX = (canvas.width - destWidth) / 2;
-        const destY = (canvas.height - destHeight) / 2;
-
         // Рисуем изображение
-        ctx.drawImage(img, sx, sy, sWidth, sHeight, destX, destY, destWidth, destHeight);
+        ctx.drawImage(img, 
+            sx, sy, sWidth, sHeight, // Область исходного изображения
+            0, 0, canvas.width, canvas.height // На весь canvas
+        );
         
         // Рисуем чип на изображении
-        const chipX = destX + destWidth * CHIP_POSITION.x;
-        const chipY = destY + destHeight * CHIP_POSITION.y;
-        const chipWidth = destWidth * CHIP_POSITION.width;
-        const chipHeight = destHeight * CHIP_POSITION.height;
+        const chipX = canvas.width * CHIP_POSITION.x;
+        const chipY = canvas.height * CHIP_POSITION.y;
+        const chipWidth = canvas.width * CHIP_POSITION.width;
+        const chipHeight = canvas.height * CHIP_POSITION.height;
         
         drawChip(ctx, chipX, chipY, chipWidth, chipHeight);
         
