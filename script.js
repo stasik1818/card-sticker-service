@@ -1,15 +1,15 @@
 console.log('Скрипт загружен!');
 
 // Точные размеры банковской карты в мм (стандарт ISO/IEC 7810)
-const CARD_WIDTH_MM = 85.6;
+const CARD_WIDTH_MM = 85.60;
 const CARD_HEIGHT_MM = 53.98;
 const CARD_RATIO = CARD_WIDTH_MM / CARD_HEIGHT_MM;
 
-// Точное позиционирование чипа согласно стандарту EMV
-const CHIP_X_MM = 7.0;    // от левого края
-const CHIP_Y_MM = 9.0;    // от верхнего края
-const CHIP_WIDTH_MM = 13.5;
-const CHIP_HEIGHT_MM = 11.0;
+// Точное позиционирование чипа согласно чертежу (в мм от краев)
+const CHIP_X_MM = 6.0;    // от левого края (6mm)
+const CHIP_Y_MM = 16.0;   // от верхнего края (16mm)
+const CHIP_WIDTH_MM = 16.0; // ширина чипа (16mm)
+const CHIP_HEIGHT_MM = 14.0; // высота чипа (14mm)
 
 // Рассчитываем пропорции чипа относительно карты
 const CHIP_POSITION = { 
@@ -27,6 +27,7 @@ const imagePreview = document.getElementById('imagePreview');
 const nameInput = document.getElementById('nameInput');
 const commentInput = document.getElementById('commentInput');
 const frame = document.getElementById('frame');
+const frameInner = document.querySelector('.frame-inner');
 const submitButton = document.getElementById('submitButton');
 const qualitySelect = document.getElementById('qualitySelect');
 const chip = document.getElementById('chip');
@@ -104,28 +105,15 @@ function drawChip(ctx, x, y, width, height) {
     ctx.fillRect(x + spacing*4 + contactWidth*3, contactY, contactWidth, contactHeight);
 }
 
-// Обновление размеров фрейма
-function updateFrameSize() {
-    const containerWidth = Math.min(428, window.innerWidth * 0.9);
-    const frameHeight = Math.round(containerWidth / CARD_RATIO);
-    frame.style.width = `${containerWidth}px`;
-    frame.style.height = `${frameHeight}px`;
+// Обновление чипа
+function updateChip() {
+    const frameRect = frameInner.getBoundingClientRect();
     
-    // Центрируем изображение при изменении размеров
-    if (imagePreview.classList.contains('loaded')) {
-        positionImage();
-    }
-}
-
-// Обновление чипа и рамки
-function updateChipAndBorder() {
-    const frameRect = frame.getBoundingClientRect();
-    
-    // Позиция чипа с точными размерами
-    const chipWidth = Math.round(frameRect.width * CHIP_POSITION.width);
-    const chipHeight = Math.round(frameRect.height * CHIP_POSITION.height);
-    const chipLeft = Math.round(frameRect.width * CHIP_POSITION.x);
-    const chipTop = Math.round(frameRect.height * CHIP_POSITION.y);
+    // Позиция чипа с точными размерами (в пикселях)
+    const chipWidth = frameRect.width * CHIP_POSITION.width;
+    const chipHeight = frameRect.height * CHIP_POSITION.height;
+    const chipLeft = frameRect.width * CHIP_POSITION.x;
+    const chipTop = frameRect.height * CHIP_POSITION.y;
     
     chip.style.width = `${chipWidth}px`;
     chip.style.height = `${chipHeight}px`;
@@ -135,18 +123,13 @@ function updateChipAndBorder() {
 
 // Позиционирование изображения
 function positionImage() {
-    const frameRect = frame.getBoundingClientRect();
+    const frameRect = frameInner.getBoundingClientRect();
     
     // Рассчитываем начальный масштаб
     minScale = Math.min(
         frameRect.width / imageWidth, 
         frameRect.height / imageHeight
     );
-    
-    // Если изображение меньше рамки
-    if (imageWidth <= frameRect.width && imageHeight <= frameRect.height) {
-        minScale = 1;
-    }
     
     scale = minScale;
     
@@ -163,13 +146,14 @@ function applyTransform() {
 }
 
 // Инициализация размеров
-updateFrameSize();
-updateChipAndBorder();
+updateChip();
 
 // Обработчик ресайза окна
 window.addEventListener('resize', () => {
-    updateFrameSize();
-    updateChipAndBorder();
+    updateChip();
+    if (imagePreview.classList.contains('loaded')) {
+        positionImage();
+    }
 });
 
 // Загрузка изображения
@@ -196,7 +180,7 @@ imageUpload.addEventListener('change', function (e) {
             imageHeight = imagePreview.naturalHeight;
             imagePreview.classList.add('loaded');
             positionImage();
-            updateChipAndBorder();
+            updateChip();
         };
         
         imagePreview.onerror = function() {
@@ -213,21 +197,25 @@ imageUpload.addEventListener('change', function (e) {
 });
 
 // Обработчики событий для перемещения и масштабирования
-imagePreview.addEventListener('mousedown', function (e) {
-    isDragging = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    imagePreview.style.transition = 'none';
+frameInner.addEventListener('mousedown', function (e) {
+    if (e.target === imagePreview) {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        imagePreview.style.transition = 'none';
+    }
 });
 
-imagePreview.addEventListener('touchstart', function (e) {
-    e.preventDefault();
-    const touches = e.touches;
-    if (touches.length === 1) {
-        isDragging = true;
-        startX = touches[0].clientX;
-        startY = touches[0].clientY;
-        imagePreview.style.transition = 'none';
+frameInner.addEventListener('touchstart', function (e) {
+    if (e.target === imagePreview) {
+        e.preventDefault();
+        const touches = e.touches;
+        if (touches.length === 1) {
+            isDragging = true;
+            startX = touches[0].clientX;
+            startY = touches[0].clientY;
+            imagePreview.style.transition = 'none';
+        }
     }
 });
 
@@ -246,18 +234,20 @@ document.addEventListener('mousemove', function (e) {
 });
 
 document.addEventListener('touchmove', function (e) {
-    e.preventDefault();
-    const touches = e.touches;
-    if (touches.length === 1 && isDragging) {
-        const deltaX = touches[0].clientX - startX;
-        const deltaY = touches[0].clientY - startY;
-        startX = touches[0].clientX;
-        startY = touches[0].clientY;
-        
-        offsetX += deltaX;
-        offsetY += deltaY;
-        
-        applyTransform();
+    if (isDragging) {
+        e.preventDefault();
+        const touches = e.touches;
+        if (touches.length === 1) {
+            const deltaX = touches[0].clientX - startX;
+            const deltaY = touches[0].clientY - startY;
+            startX = touches[0].clientX;
+            startY = touches[0].clientY;
+            
+            offsetX += deltaX;
+            offsetY += deltaY;
+            
+            applyTransform();
+        }
     }
 });
 
@@ -271,29 +261,31 @@ document.addEventListener('touchend', function () {
     imagePreview.style.transition = 'transform 0.1s ease-out';
 });
 
-imagePreview.addEventListener('wheel', function (e) {
-    e.preventDefault();
+frameInner.addEventListener('wheel', function (e) {
+    if (imagePreview.classList.contains('loaded')) {
+        e.preventDefault();
 
-    const rect = frame.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+        const rect = frameInner.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
 
-    const prevScale = scale;
-    
-    if (e.deltaY < 0) {
-        scale *= 1.1; // Увеличение
-    } else {
-        scale *= 0.9; // Уменьшение
+        const prevScale = scale;
+        
+        if (e.deltaY < 0) {
+            scale *= 1.1; // Увеличение
+        } else {
+            scale *= 0.9; // Уменьшение
+        }
+        
+        // Ограничиваем масштаб
+        scale = Math.max(minScale, Math.min(scale, 10));
+        
+        // Корректируем смещение для сохранения позиции под курсором
+        offsetX = mouseX - (mouseX - offsetX) * (scale / prevScale);
+        offsetY = mouseY - (mouseY - offsetY) * (scale / prevScale);
+        
+        applyTransform();
     }
-    
-    // Ограничиваем масштаб
-    scale = Math.max(minScale, Math.min(scale, 10));
-    
-    // Корректируем смещение для сохранения позиции под курсором
-    offsetX = mouseX - (mouseX - offsetX) * (scale / prevScale);
-    offsetY = mouseY - (mouseY - offsetY) * (scale / prevScale);
-    
-    applyTransform();
 });
 
 // Отправка данных
@@ -313,11 +305,11 @@ async function submitImage() {
     
     // Фиксированный размер области кадрирования в пикселях
     const cropWidth = 1200;
-    const cropHeight = Math.round(cropWidth / CARD_RATIO);
+    const cropHeight = Math.round(cropWidth * CARD_HEIGHT_MM / CARD_WIDTH_MM);
     canvas.width = cropWidth;
     canvas.height = cropHeight;
 
-    const frameRect = frame.getBoundingClientRect();
+    const frameRect = frameInner.getBoundingClientRect();
     
     // Рассчитываем видимую область изображения
     const visibleWidth = frameRect.width / scale;
