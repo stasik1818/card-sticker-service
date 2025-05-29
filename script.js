@@ -27,7 +27,6 @@ const imagePreview = document.getElementById('imagePreview');
 const nameInput = document.getElementById('nameInput');
 const commentInput = document.getElementById('commentInput');
 const frame = document.getElementById('frame');
-const frameInner = document.querySelector('.frame-inner');
 const submitButton = document.getElementById('submitButton');
 const qualitySelect = document.getElementById('qualitySelect');
 const chip = document.getElementById('chip');
@@ -105,9 +104,17 @@ function drawChip(ctx, x, y, width, height) {
     ctx.fillRect(x + spacing*4 + contactWidth*3, contactY, contactWidth, contactHeight);
 }
 
+// Обновление размеров фрейма
+function updateFrameSize() {
+    const containerWidth = Math.min(428, window.innerWidth * 0.9);
+    const frameHeight = Math.round(containerWidth / CARD_RATIO);
+    frame.style.width = `${containerWidth}px`;
+    frame.style.height = `${frameHeight}px`;
+}
+
 // Обновление чипа
 function updateChip() {
-    const frameRect = frameInner.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
     
     // Позиция чипа с точными размерами (в пикселях)
     const chipWidth = frameRect.width * CHIP_POSITION.width;
@@ -123,7 +130,7 @@ function updateChip() {
 
 // Позиционирование изображения
 function positionImage() {
-    const frameRect = frameInner.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
     
     // Рассчитываем начальный масштаб
     minScale = Math.min(
@@ -146,10 +153,12 @@ function applyTransform() {
 }
 
 // Инициализация размеров
+updateFrameSize();
 updateChip();
 
 // Обработчик ресайза окна
 window.addEventListener('resize', () => {
+    updateFrameSize();
     updateChip();
     if (imagePreview.classList.contains('loaded')) {
         positionImage();
@@ -197,25 +206,21 @@ imageUpload.addEventListener('change', function (e) {
 });
 
 // Обработчики событий для перемещения и масштабирования
-frameInner.addEventListener('mousedown', function (e) {
-    if (e.target === imagePreview) {
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        imagePreview.style.transition = 'none';
-    }
+imagePreview.addEventListener('mousedown', function (e) {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    imagePreview.style.transition = 'none';
 });
 
-frameInner.addEventListener('touchstart', function (e) {
-    if (e.target === imagePreview) {
-        e.preventDefault();
-        const touches = e.touches;
-        if (touches.length === 1) {
-            isDragging = true;
-            startX = touches[0].clientX;
-            startY = touches[0].clientY;
-            imagePreview.style.transition = 'none';
-        }
+imagePreview.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    const touches = e.touches;
+    if (touches.length === 1) {
+        isDragging = true;
+        startX = touches[0].clientX;
+        startY = touches[0].clientY;
+        imagePreview.style.transition = 'none';
     }
 });
 
@@ -261,20 +266,20 @@ document.addEventListener('touchend', function () {
     imagePreview.style.transition = 'transform 0.1s ease-out';
 });
 
-frameInner.addEventListener('wheel', function (e) {
+frame.addEventListener('wheel', function (e) {
     if (imagePreview.classList.contains('loaded')) {
         e.preventDefault();
 
-        const rect = frameInner.getBoundingClientRect();
+        const rect = frame.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
         const prevScale = scale;
         
         if (e.deltaY < 0) {
-            scale *= 1.1; // Увеличение
+            scale *= 1.05; // Увеличение
         } else {
-            scale *= 0.9; // Уменьшение
+            scale *= 0.95; // Уменьшение
         }
         
         // Ограничиваем масштаб
@@ -309,7 +314,7 @@ async function submitImage() {
     canvas.width = cropWidth;
     canvas.height = cropHeight;
 
-    const frameRect = frameInner.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
     
     // Рассчитываем видимую область изображения
     const visibleWidth = frameRect.width / scale;
