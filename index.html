@@ -34,16 +34,22 @@
     }
     .upload-area {
       position: relative;
-      width: 428px;
-      height: 270px;
-      aspect-ratio: 85.60 / 53.98;
+      width: 80%;
+      height: 0;
+      padding-bottom: calc(80% * 53.98 / 85.60); /* Соотношение 85.60:53.98 */
       border-radius: 8px;
       overflow: hidden;
-      border: 3px solid;
+      border: 3px solid #ccc;
       background-color: #fff;
-      max-width: 90vw;
       touch-action: none;
-      transition: border-color 0.3s;
+    }
+    .frame-inner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
     }
     #imagePreview {
       position: absolute;
@@ -51,8 +57,6 @@
       max-width: none;
       max-height: none;
       object-fit: none;
-      left: 0;
-      top: 0;
       display: none;
       will-change: transform;
     }
@@ -61,23 +65,11 @@
     }
     .chip-overlay {
       position: absolute;
-      background: linear-gradient(135deg, #e6c260 0%, #d4af37 100%);
-      border-radius: 1.5mm;
-      box-shadow: 
-        0 2px 5px rgba(0,0,0,0.3),
-        inset 0 0 10px rgba(0,0,0,0.2);
+      box-shadow: 0 0 4px rgba(0,0,0,0.3);
+      background: rgba(220, 220, 220, 0.7);
+      border-radius: 3px;
       pointer-events: none;
       z-index: 1;
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      padding: 0 8%;
-    }
-    .chip-contact {
-      width: 8%;
-      height: 50%;
-      background: #333;
-      border-radius: 1px;
     }
     input[type="file"] {
       display: none;
@@ -119,8 +111,8 @@
     }
     @media (max-width: 600px) {
       .upload-area {
-        width: 90vw;
-        aspect-ratio: 85.60 / 53.98;
+        width: 90%;
+        padding-bottom: calc(90% * 53.98 / 85.60);
       }
       h2 {
         font-size: 1.1em;
@@ -164,13 +156,10 @@
   <div class="container">
     <h2>Создать наклейку для банковской карты</h2>
     <div class="upload-area" id="frame">
-      <div class="chip-overlay" id="chip">
-        <div class="chip-contact"></div>
-        <div class="chip-contact"></div>
-        <div class="chip-contact"></div>
-        <div class="chip-contact"></div>
+      <div class="frame-inner">
+        <div class="chip-overlay" id="chip"></div>
+        <img id="imagePreview" src="" alt="Ваше фото появится здесь" />
       </div>
-      <img id="imagePreview" src="" alt="Ваше фото появится здесь" />
     </div>
     <label class="upload-btn" for="imageUpload">Выбрать фото</label>
     <input type="file" id="imageUpload" accept="image/*" />
