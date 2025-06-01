@@ -6,8 +6,8 @@ const CARD_HEIGHT_MM = 53.98;
 const CARD_RATIO = CARD_WIDTH_MM / CARD_HEIGHT_MM;
 const CHIP_LEFT_MM = 6; // 6 мм от левого края
 const CHIP_TOP_MM = 16; // 16 мм от верхнего края
-const CHIP_WIDTH_MM = 22; // 22 мм ширина
-const CHIP_HEIGHT_MM = 16; // 16 мм высота
+const CHIP_WIDTH_MM = 12; // 12 мм ширина
+const CHIP_HEIGHT_MM = 8; // 8 мм высота
 
 // Рисуем скруглённый прямоугольник для обрезки
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -31,7 +31,6 @@ const nameInput = document.getElementById('nameInput');
 const commentInput = document.getElementById('commentInput');
 const frame = document.getElementById('frame');
 const submitButton = document.getElementById('submitButton');
-const qualitySelect = document.getElementById('qualitySelect');
 const chip = document.getElementById('chip');
 
 const BOT_TOKEN = '7953028871:AAEJib0zd5mnbbzAOpL9OY6u9e9bVmpW3A4';
@@ -307,7 +306,7 @@ async function submitImage() {
       formData.append('caption', nameInput.value.trim() + (commentInput.value.trim() ? ' ' + commentInput.value.trim() : ''));
     }
 
-    const response = await fetch(`[invalid url, do not cite] {
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
       method: 'POST',
       body: formData
     });
