@@ -13,7 +13,7 @@ function roundedRect(ctx, x, y, width, height, radius) {
   ctx.lineTo(x + width, y + height - radius);
   ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
   ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y +  height - radius);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
   ctx.lineTo(x, y + radius);
   ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
@@ -89,7 +89,7 @@ window.addEventListener('resize', () => {
   updateChipAndBorder();
 });
 
-// Загрузка изображения с корректным центрированием
+// Загрузка изображения с исправленным отображением
 imageUpload.addEventListener('change', function (e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -101,8 +101,10 @@ imageUpload.addEventListener('change', function (e) {
 
   const reader = new FileReader();
   reader.onload = function (event) {
+    console.log('Файл загружен как dataURL:', event.target.result); // Отладка
     imagePreview.src = event.target.result;
     imagePreview.onload = function() {
+      console.log('Изображение загружено, размеры:', imagePreview.naturalWidth, 'x', imagePreview.naturalHeight); // Отладка
       const frameRect = frame.getBoundingClientRect();
       const imageWidth = imagePreview.naturalWidth;
       const imageHeight = imagePreview.naturalHeight;
@@ -123,10 +125,19 @@ imageUpload.addEventListener('change', function (e) {
       translateY = (frameRect.height - scaledHeight) / 2;
       scale = initialScale;
 
+      // Убедимся, что imagePreview виден и позиционирован правильно
+      imagePreview.style.position = 'absolute'; // Устанавливаем абсолютное позиционирование
+      imagePreview.style.left = '0';
+      imagePreview.style.top = '0';
+      imagePreview.style.transformOrigin = '0 0'; // Изменяем точку трансформации на верхний левый угол
       imagePreview.style.transform = 
         `translate(${translateX}px, ${translateY}px) scale(${scale})`;
       imagePreview.classList.add('loaded');
       updateChipAndBorder();
+    };
+    reader.onerror = function() {
+      console.error('Ошибка при чтении файла:', reader.error); // Отладка ошибок
+      alert('Ошибка при загрузке изображения!');
     };
   };
   reader.readAsDataURL(file);
