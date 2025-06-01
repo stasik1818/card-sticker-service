@@ -1,7 +1,7 @@
 console.log('Скрипт загружен, погнали!');
 
 // Константы для карты
-const CARD_RATIO = 85.60 / 53.98; // Соотношение сторон карты
+const CARD_RATIO = 85.60 / 53.98; // Соотношение сторон карты (примерно 1.585)
 const CHIP_POSITION = { x: 0.12, y: 0.08, width: 0.15, height: 0.1 }; // Позиция чипа
 
 // Рисуем скруглённый прямоугольник для обрезки
@@ -13,7 +13,7 @@ function roundedRect(ctx, x, y, width, height, radius) {
   ctx.lineTo(x + width, y + height - radius);
   ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
   ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.quadraticCurveTo(x, y + height, x, y +  height - radius);
   ctx.lineTo(x, y + radius);
   ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
@@ -47,11 +47,12 @@ let pinchStartScale = 1;
 updateFrameSize();
 updateChipAndBorder();
 
-// Обновление размеров фрейма
+// Обновление размеров фрейма с сохранением пропорций карты
 function updateFrameSize() {
-  const containerWidth = Math.min(428, window.innerWidth * 0.9);
-  const frameHeight = containerWidth / CARD_RATIO;
-  frame.style.width = containerWidth + 'px';
+  const maxWidth = Math.min(428, window.innerWidth * 0.9); // Максимальная ширина - 428px или 90% окна
+  const frameWidth = maxWidth;
+  const frameHeight = frameWidth / CARD_RATIO; // Высота рассчитывается с учетом соотношения сторон
+  frame.style.width = frameWidth + 'px';
   frame.style.height = frameHeight + 'px';
 }
 
@@ -186,6 +187,11 @@ function touchMove(e) {
   }
 }
 
+function touchEnd() {
+  isDragging = false; // Завершение зума или перемещения при отпускании пальцев
+}
+
+// Обработчик зума колесом мыши
 function zoom(e) {
   e.preventDefault();
   const delta = e.deltaY < 0 ? 0.1 : -0.1;
