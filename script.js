@@ -88,7 +88,7 @@ window.addEventListener('resize', () => {
   updateChipAndBorder();
 });
 
-// Загрузка изображения
+// Загрузка изображения с корректным центрированием
 imageUpload.addEventListener('change', function (e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -115,8 +115,11 @@ imageUpload.addEventListener('change', function (e) {
         initialScale = 1;
       }
 
-      translateX = (frameRect.width - imageWidth * initialScale) / 2;
-      translateY = (frameRect.height - imageHeight * initialScale) / 2;
+      // Корректное центрирование: центр изображения совпадает с центром фрейма
+      const scaledWidth = imageWidth * initialScale;
+      const scaledHeight = imageHeight * initialScale;
+      translateX = (frameRect.width - scaledWidth) / 2;
+      translateY = (frameRect.height - scaledHeight) / 2;
       scale = initialScale;
 
       imagePreview.style.transform = 
