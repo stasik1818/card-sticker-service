@@ -1,173 +1,117 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.telegram.org" />
-  <title>Редактор наклеек для банковских карт</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Создать наклейку для банковской карты</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       display: flex;
-      flex-direction: column;
+      justify-content: center;
       align-items: center;
-      background-color: #f9f9f9;
-      margin: 0;
-      padding: 8px;
       min-height: 100vh;
-      box-sizing: border-box;
-      overscroll-behavior: none;
-    }
-    .container {
-      display: flex;
+      margin: 0;
+      background-color: #f0f0f0;
       flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      max-width: 100%;
-      width: 100%;
-      box-sizing: border-box;
+      padding: 20px;
     }
-    h2 {
-      font-size: 1.4em;
-      margin: 8px 0;
-      text-align: center;
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
     }
-    .upload-area {
+    #frame {
       position: relative;
-      width: 428px;
-      height: 270px;
-      aspect-ratio: 85.60 / 53.98;
+      border: 2px solid #000;
       border-radius: 8px;
       overflow: hidden;
-      border: 3px solid;
       background-color: #fff;
-      max-width: 90vw;
-      touch-action: none;
-      transition: border-color 0.3s;
     }
     #imagePreview {
       position: absolute;
-      cursor: grab;
-      max-width: none;
-      max-height: none;
-      object-fit: none;
-      left: 0;
       top: 0;
-      display: none;
-      will-change: transform;
+      left: 0;
+      display: none; /* Скрыто до загрузки */
+      max-width: none; /* Позволяет масштабировать изображение */
+      max-height: none;
     }
     #imagePreview.loaded {
-      display: block;
+      display: block; /* Показываем после загрузки */
+      transition: transform 0.2s ease; /* Плавное изменение при перемещении/масштабировании */
     }
-    .chip-overlay {
+    #chip {
       position: absolute;
-      box-shadow: 0 0 4px rgba(0,0,0,0.3);
-      background: rgba(220, 220, 220, 0.7);
-      border-radius: 3px;
-      pointer-events: none;
-      z-index: 1;
+      border: 1px dashed #ff0000; /* Для отладки области чипа */
+      pointer-events: none; /* Чтобы чип не мешал взаимодействию */
     }
+    .form-group {
+      margin: 15px 0;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input[type="text"],
     input[type="file"] {
-      display: none;
+      width: 100%;
+      max-width: 300px;
+      padding: 8px;
+      margin-top: 5px;
     }
-    label.upload-btn {
-      padding: 6px 12px;
-      background-color: #007BFF;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.95em;
-    }
-    input[type="text"], textarea, select {
-      width: 90%;
-      max-width: 280px;
-      padding: 6px;
-      margin: 4px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.95em;
-      box-sizing: border-box;
-    }
-    textarea {
-      resize: vertical;
-      min-height: 60px;
+    .quality-options {
+      display: flex;
+      flex-direction: column;
     }
     button {
-      padding: 6px 12px;
-      background-color: #28a745;
-      color: white;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: #fff;
       border: none;
-      border-radius: 4px;
+      border-radius: 5px;
       cursor: pointer;
-      font-size: 0.95em;
+      margin-top: 10px;
     }
     button:hover {
-      background-color: #218838;
-    }
-    @media (max-width: 600px) {
-      .upload-area {
-        width: 90vw;
-        aspect-ratio: 85.60 / 53.98;
-      }
-      h2 {
-        font-size: 1.1em;
-        margin: 6px 0;
-      }
-      label.upload-btn, button, select {
-        padding: 5px 10px;
-        font-size: 0.85em;
-      }
-      input[type="text"], textarea, select {
-        width: 85%;
-        max-width: 260px;
-        padding: 5px;
-        font-size: 0.85em;
-      }
-      textarea {
-        min-height: 50px;
-      }
-      .container {
-        gap: 8px;
-      }
-    }
-    @media (max-width: 400px) {
-      h2 {
-        font-size: 1em;
-      }
-      label.upload-btn, button, select {
-        padding: 4px 8px;
-        font-size: 0.8em;
-      }
-      input[type="text"], textarea, select {
-        width: 90%;
-        max-width: 240px;
-        padding: 4px;
-        font-size: 0.8em;
-      }
+      background-color: #0056b3;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Создать наклейку для банковской карты</h2>
-    <div class="upload-area" id="frame">
-      <div class="chip-overlay" id="chip"></div>
-      <img id="imagePreview" src="" alt="Ваше фото появится здесь" />
-    </div>
-<label class="upload-btn" for="imageUpload">Выбрать фото</label>
-    <input type="file" id="imageUpload" accept="image/*" />
-    <input type="text" id="nameInput" placeholder="Ваше имя" />
-    <textarea id="commentInput" placeholder="Комментарий к заказу" rows="4"></textarea>
-    <select id="qualitySelect">
-      <option value="jpeg-low">JPEG (низкое качество, маленький размер)</option>
-      <option value="jpeg-medium" selected>JPEG (среднее качество)</option>
-      <option value="jpeg-high">JPEG (высокое качество)</option>
-      <option value="png">PNG (максимальное качество)</option>
-    </select>
-    <button id="submitButton">Отправить</button>
+  <h1>Создать наклейку для банковской карты</h1>
+
+  <div class="form-group">
+    <label for="imageUpload">Выбрать фото</label>
+    <input type="file" id="imageUpload" accept="image/*">
   </div>
+
+  <div id="frame">
+    <img id="imagePreview" src="" alt="Preview">
+    <div id="chip"></div>
+  </div>
+
+  <div class="form-group">
+    <label for="nameInput">Имя (обязательно)</label>
+    <input type="text" id="nameInput" placeholder="Введите ваше имя">
+  </div>
+
+  <div class="form-group">
+    <label for="commentInput">Комментарий (опционально)</label>
+    <input type="text" id="commentInput" placeholder="Введите комментарий">
+  </div>
+
+  <div class="form-group">
+    <label>Качество фото:</label>
+    <div class="quality-options">
+      <label><input type="radio" name="photoQuality" value="jpegLow"> JPEG (низкое качество, маленький размер)</label>
+      <label><input type="radio" name="photoQuality" value="jpegMedium"> JPEG (среднее качество)</label>
+      <label><input type="radio" name="photoQuality" value="jpegHigh"> JPEG (высокое качество)</label>
+      <label><input type="radio" name="photoQuality" value="pngMax"> PNG (максимальное качество)</label>
+    </div>
+  </div>
+
+  <button id="submitButton">Отправить</button>
+
   <script src="script.js"></script>
 </body>
 </html>
