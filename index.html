@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -66,24 +67,6 @@
       border-radius: 3px;
       pointer-events: none;
       z-index: 1;
-    }
-    .text-overlay {
-      position: absolute;
-      color: white;
-      font-weight: bold;
-      text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
-      pointer-events: none;
-      z-index: 2;
-    }
-    #textName {
-      bottom: 30px;
-      left: 20px;
-      font-size: 18px;
-    }
-    #textComment {
-      bottom: 60px;
-      left: 20px;
-      font-size: 14px;
     }
     input[type="file"] {
       display: none;
@@ -172,10 +155,8 @@
     <div class="upload-area" id="frame">
       <div class="chip-overlay" id="chip"></div>
       <img id="imagePreview" src="" alt="Ваше фото появится здесь" />
-      <div class="text-overlay" id="textName"></div>
-      <div class="text-overlay" id="textComment"></div>
     </div>
-    <label class="upload-btn" for="imageUpload">Выбрать фото</label>
+<label class="upload-btn" for="imageUpload">Выбрать фото</label>
     <input type="file" id="imageUpload" accept="image/*" />
     <input type="text" id="nameInput" placeholder="Ваше имя" />
     <textarea id="commentInput" placeholder="Комментарий к заказу" rows="4"></textarea>
