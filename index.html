@@ -45,8 +45,9 @@
     }
     #chip {
       position: absolute;
-      background-color: rgba(255, 215, 0, 0.3); /* Полупрозрачный золотой */
-      border-radius: 5px; /* Закругленные края */
+      background-image: url('chip.png'); /* Изображение чипа */
+      background-size: cover;
+      border-radius: 2px; /* Закругленные углы */
       pointer-events: none;
     }
     .form-group {
@@ -140,6 +141,8 @@
   </div>
 
   <button id="submitButton">Отправить</button>
+
+  <img id="chipImage" src="chip.png" style="display:none">
 
   <script src="script.js"></script>
 </body>
