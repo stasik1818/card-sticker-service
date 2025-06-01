@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Создать наклейку для банковской карты</title>
   <style>
     body {
@@ -16,6 +16,7 @@
       flex-direction: column;
       padding: 20px;
       color: #333;
+      touch-action: none; /* Запрещаем масштабирование страницы */
     }
     h1 {
       font-size: 28px;
@@ -30,8 +31,9 @@
       overflow: hidden;
       background-color: #fff;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      width: 300px; /* Фиксированная ширина для теста */
-      height: 189px; /* Соотношение 85.6:53.98 */
+      width: 300px;
+      height: 189px;
+      touch-action: pinch-zoom pan-x pan-y; /* Разрешаем масштабирование и перемещение только внутри фрейма */
     }
     #imagePreview {
       position: absolute;
@@ -47,7 +49,7 @@
     }
     #chip {
       position: absolute;
-      background-image: url('chip.png'); /* Предполагаем, что изображение загружено */
+      background-image: url('chip.png');
       background-size: cover;
       border-radius: 2px;
       pointer-events: none;
