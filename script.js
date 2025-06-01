@@ -2,7 +2,14 @@ console.log('Скрипт загружен, погнали!');
 
 // Константы для карты
 const CARD_RATIO = 85.60 / 53.98; // Соотношение сторон карты
-const CHIP_POSITION = { x: 0.12, y: 0.08, width: 0.15, height: 0.1 }; // Позиция чипа
+
+// ОБНОВЛЕННЫЕ ПАРАМЕТРЫ ЧИПА (16мм сверху, 6мм слева, 16x14мм)
+const CHIP_POSITION = { 
+  x: 0.0701,  // 6mm / 85.60mm
+  y: 0.2964,  // 16mm / 53.98mm
+  width: 0.1869, // 16mm / 85.60mm
+  height: 0.2594 // 14mm / 53.98mm
+};
 
 // Рисуем скруглённый прямоугольник для обрезки
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -62,7 +69,7 @@ function updateFrameSize() {
 function updateChipAndBorder() {
   const frameRect = frame.getBoundingClientRect();
   
-  // Позиция чипа
+  // Позиция чипа с новыми параметрами
   chip.style.width = `${frameRect.width * CHIP_POSITION.width}px`;
   chip.style.height = `${frameRect.height * CHIP_POSITION.height}px`;
   chip.style.left = `${frameRect.width * CHIP_POSITION.x}px`;
@@ -91,7 +98,7 @@ window.addEventListener('resize', () => {
   updateChipAndBorder();
 });
 
-// Загрузка изображения
+// Загрузка изображения - ОБНОВЛЕНО ДЛЯ ЦЕНТРИРОВАНИЯ
 imageUpload.addEventListener('change', function (e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -109,18 +116,15 @@ imageUpload.addEventListener('change', function (e) {
       const imageWidth = imagePreview.naturalWidth;
       const imageHeight = imagePreview.naturalHeight;
       
-      let initialScale = Math.min(
+      // Рассчитываем масштаб для заполнения области
+      scale = Math.max(
         frameRect.width / imageWidth, 
         frameRect.height / imageHeight
       );
       
-      if (imageWidth <= frameRect.width && imageHeight <= frameRect.height) {
-        initialScale = 1;
-      }
-
-      translateX = (frameRect.width - imageWidth * initialScale) / 2;
-      translateY = (frameRect.height - imageHeight * initialScale) / 2;
-      scale = initialScale;
+      // Центрируем изображение
+      translateX = (frameRect.width - imageWidth * scale) / 2;
+      translateY = (frameRect.height - imageHeight * scale) / 2;
 
       imagePreview.style.transform = 
         `translate3d(${translateX}px, ${translateY}px, 0) 
@@ -257,13 +261,14 @@ async function submitImage() {
     const destY = (canvas.height - destHeight) / 2;
     ctx.drawImage(img, sx, sy, sWidth, sHeight, destX, destY, destWidth, destHeight);
 
-    // Рисуем чип
+    // Рисуем чип с ОБНОВЛЕННЫМИ параметрами
     const chipX = canvas.width * CHIP_POSITION.x;
     const chipY = canvas.height * CHIP_POSITION.y;
     const chipWidth = canvas.width * CHIP_POSITION.width;
     const chipHeight = canvas.height * CHIP_POSITION.height;
     
-    ctx.fillStyle = '#d9c8a9';
+    // Золотой цвет для чипа
+    ctx.fillStyle = '#ffd700';
     ctx.fillRect(chipX, chipY, chipWidth, chipHeight);
     
     // Рисуем текст
