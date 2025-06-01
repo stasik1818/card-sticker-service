@@ -276,7 +276,7 @@ async function submitImage() {
 
     ctx.drawImage(img, sx, sy, sWidth, sHeight, destX, destY, destWidth, destHeight);
 
-    // Отрисовка чипа
+    // Отрисовка чипа с закругленными углами
     const chipImg = document.getElementById('chipImage');
     const scaleCanvasX = canvas.width / CARD_WIDTH_MM;
     const scaleCanvasY = canvas.height / CARD_HEIGHT_MM;
@@ -284,11 +284,20 @@ async function submitImage() {
     const chipCanvasTop = CHIP_TOP_MM * scaleCanvasY;
     const chipCanvasWidth = CHIP_WIDTH_MM * scaleCanvasX;
     const chipCanvasHeight = CHIP_HEIGHT_MM * scaleCanvasY;
+    
+    // Сохраняем контекст перед применением маски
+    ctx.save();
+    roundedRect(ctx, chipCanvasLeft, chipCanvasTop, chipCanvasWidth, chipCanvasHeight, 28); // 28 пикселей для масштаба 1200 пикселей
+    ctx.clip();
+    
     await new Promise((resolve) => {
       chipImg.onload = resolve;
       if (chipImg.complete) resolve();
     });
     ctx.drawImage(chipImg, chipCanvasLeft, chipCanvasTop, chipCanvasWidth, chipCanvasHeight);
+    
+    // Восстанавливаем контекст
+    ctx.restore();
 
     const blob = await new Promise(resolve => {
       if (type === 'image/jpeg') {
