@@ -1,8 +1,13 @@
 console.log('Скрипт загружен, погнали!');
 
-// Константы для карты
-const CARD_RATIO = 85.60 / 53.98; // Соотношение сторон карты (примерно 1.585)
-const CHIP_POSITION = { x: 0.12, y: 0.08, width: 0.15, height: 0.1 }; // Позиция чипа
+// Константы для карты и чипа
+const CARD_WIDTH_MM = 85.6;
+const CARD_HEIGHT_MM = 53.98;
+const CARD_RATIO = CARD_WIDTH_MM / CARD_HEIGHT_MM;
+const CHIP_LEFT_MM = 6; // 6 мм от левого края
+const CHIP_TOP_MM = 16; // 16 мм от верхнего края
+const CHIP_WIDTH_MM = 22; // 22 мм ширина
+const CHIP_HEIGHT_MM = 16; // 16 мм высота
 
 // Рисуем скруглённый прямоугольник для обрезки
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -49,9 +54,9 @@ updateChipAndBorder();
 
 // Обновление размеров фрейма с сохранением пропорций карты
 function updateFrameSize() {
-  const maxWidth = Math.min(428, window.innerWidth * 0.9); // Максимальная ширина - 428px или 90% окна
+  const maxWidth = Math.min(428, window.innerWidth * 0.9);
   const frameWidth = maxWidth;
-  const frameHeight = frameWidth / CARD_RATIO; // Высота рассчитывается с учетом соотношения сторон
+  const frameHeight = frameWidth / CARD_RATIO;
   frame.style.width = frameWidth + 'px';
   frame.style.height = frameHeight + 'px';
 }
@@ -59,12 +64,11 @@ function updateFrameSize() {
 // Обновление чипа и рамки
 function updateChipAndBorder() {
   const frameRect = frame.getBoundingClientRect();
-  
-  // Позиция чипа
-  chip.style.width = frameRect.width * CHIP_POSITION.width + 'px';
-  chip.style.height = frameRect.height * CHIP_POSITION.height + 'px';
-  chip.style.left = frameRect.width * CHIP_POSITION.x + 'px';
-  chip.style.top = frameRect.height * CHIP_POSITION.y + 'px';
+  const scale = frameRect.width / CARD_WIDTH_MM; // Пикселей на мм
+  chip.style.left = (CHIP_LEFT_MM * scale) + 'px';
+  chip.style.top = (CHIP_TOP_MM * scale) + 'px';
+  chip.style.width = (CHIP_WIDTH_MM * scale) + 'px';
+  chip.style.height = (CHIP_HEIGHT_MM * scale) + 'px';
 
   // Автоматический цвет рамки
   if (imagePreview.src) {
@@ -89,7 +93,7 @@ window.addEventListener('resize', () => {
   updateChipAndBorder();
 });
 
-// Загрузка изображения с исправленным отображением
+// Загрузка изображения
 imageUpload.addEventListener('change', function (e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -101,10 +105,10 @@ imageUpload.addEventListener('change', function (e) {
 
   const reader = new FileReader();
   reader.onload = function (event) {
-    console.log('Файл загружен как dataURL:', event.target.result); // Отладка
+    console.log('Файл загружен как dataURL:', event.target.result);
     imagePreview.src = event.target.result;
     imagePreview.onload = function() {
-      console.log('Изображение загружено, размеры:', imagePreview.naturalWidth, 'x', imagePreview.naturalHeight); // Отладка
+      console.log('Изображение загружено, размеры:', imagePreview.naturalWidth, 'x', imagePreview.naturalHeight);
       const frameRect = frame.getBoundingClientRect();
       const imageWidth = imagePreview.naturalWidth;
       const imageHeight = imagePreview.naturalHeight;
@@ -118,25 +122,23 @@ imageUpload.addEventListener('change', function (e) {
         initialScale = 1;
       }
 
-      // Корректное центрирование: центр изображения совпадает с центром фрейма
       const scaledWidth = imageWidth * initialScale;
       const scaledHeight = imageHeight * initialScale;
       translateX = (frameRect.width - scaledWidth) / 2;
       translateY = (frameRect.height - scaledHeight) / 2;
       scale = initialScale;
 
-      // Убедимся, что imagePreview виден и позиционирован правильно
-      imagePreview.style.position = 'absolute'; // Устанавливаем абсолютное позиционирование
+      imagePreview.style.position = 'absolute';
       imagePreview.style.left = '0';
       imagePreview.style.top = '0';
-      imagePreview.style.transformOrigin = '0 0'; // Изменяем точку трансформации на верхний левый угол
+      imagePreview.style.transformOrigin = '0 0';
       imagePreview.style.transform = 
         `translate(${translateX}px, ${translateY}px) scale(${scale})`;
       imagePreview.classList.add('loaded');
       updateChipAndBorder();
     };
     reader.onerror = function() {
-      console.error('Ошибка при чтении файла:', reader.error); // Отладка ошибок
+      console.error('Ошибка при чтении файла:', reader.error);
       alert('Ошибка при загрузке изображения!');
     };
   };
@@ -199,7 +201,7 @@ function touchMove(e) {
 }
 
 function touchEnd() {
-  isDragging = false; // Завершение зума или перемещения при отпускании пальцев
+  isDragging = false;
 }
 
 // Обработчик зума колесом мыши
@@ -275,6 +277,20 @@ async function submitImage() {
 
     ctx.drawImage(img, sx, sy, sWidth, sHeight, destX, destY, destWidth, destHeight);
 
+    // Отрисовка чипа
+    const chipImg = document.getElementById('chipImage');
+    const scaleCanvasX = canvas.width / CARD_WIDTH_MM;
+    const scaleCanvasY = canvas.height / CARD_HEIGHT_MM;
+    const chipCanvasLeft = CHIP_LEFT_MM * scaleCanvasX;
+    const chipCanvasTop = CHIP_TOP_MM * scaleCanvasY;
+    const chipCanvasWidth = CHIP_WIDTH_MM * scaleCanvasX;
+    const chipCanvasHeight = CHIP_HEIGHT_MM * scaleCanvasY;
+    await new Promise((resolve) => {
+      chipImg.onload = resolve;
+      if (chipImg.complete) resolve();
+    });
+    ctx.drawImage(chipImg, chipCanvasLeft, chipCanvasTop, chipCanvasWidth, chipCanvasHeight);
+
     const blob = await new Promise(resolve => {
       if (type === 'image/jpeg') {
         canvas.toBlob(resolve, type, quality);
@@ -291,7 +307,7 @@ async function submitImage() {
       formData.append('caption', nameInput.value.trim() + (commentInput.value.trim() ? ' ' + commentInput.value.trim() : ''));
     }
 
-    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+    const response = await fetch(`[invalid url, do not cite] {
       method: 'POST',
       body: formData
     });
