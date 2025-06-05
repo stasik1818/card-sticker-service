@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Создать наклейку для банковской карты</title>
   <style>
     body {
@@ -16,7 +16,7 @@
       flex-direction: column;
       padding: 20px;
       color: #333;
-      touch-action: none; /* Запрещаем масштабирование страницы */
+      touch-action: pan-y;
     }
     h1 {
       font-size: 28px;
@@ -31,9 +31,7 @@
       overflow: hidden;
       background-color: #fff;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      width: 300px;
-      height: 189px;
-      touch-action: pinch-zoom pan-x pan-y; /* Разрешаем масштабирование и перемещение только внутри фрейма */
+      touch-action: none;
     }
     #imagePreview {
       position: absolute;
@@ -51,7 +49,6 @@
       position: absolute;
       background-image: url('chip.png');
       background-size: cover;
-      border-radius: 2px;
       pointer-events: none;
     }
     .form-group {
@@ -137,7 +134,7 @@
   <div class="form-group">
     <label>Качество фото:</label>
     <div class="quality-options">
-      <label><input type="radio" name="photoQuality" value="jpegLow"> JPEG (низкое качество, маленький размер)</label>
+      <label><input type="radio" name="photoQuality" value="jpegLow"> JPEG (низкое качество)</label>
       <label><input type="radio" name="photoQuality" value="jpegMedium"> JPEG (среднее качество)</label>
       <label><input type="radio" name="photoQuality" value="jpegHigh"> JPEG (высокое качество)</label>
       <label><input type="radio" name="photoQuality" value="pngMax"> PNG (максимальное качество)</label>
