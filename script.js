@@ -1,13 +1,14 @@
-console.log('Скрипт загружен, погнали!');
+console.log('Скрипт загружен!');
 
 // Константы для карты и чипа
 const CARD_WIDTH_MM = 85.6;
 const CARD_HEIGHT_MM = 53.98;
 const CARD_RATIO = CARD_WIDTH_MM / CARD_HEIGHT_MM;
-const CHIP_LEFT_MM = 6; // 6 мм от левого края
-const CHIP_TOP_MM = 16; // 16 мм от верхнего края
+const CHIP_LEFT_MM = 10; // 10 мм от левого края
+const CHIP_TOP_MM = 19.5; // 19.5 мм от верхнего края
 const CHIP_WIDTH_MM = 12; // 12 мм ширина
-const CHIP_HEIGHT_MM = 8; // 8 мм высота
+const CHIP_HEIGHT_MM = 9; // 9 мм высота
+const CHIP_CORNER_RADIUS_MM = 1; // 1 мм закругления краёв
 
 // Рисуем скруглённый прямоугольник для обрезки
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -63,26 +64,37 @@ function updateFrameSize() {
 // Обновление чипа и рамки
 function updateChipAndBorder() {
   const frameRect = frame.getBoundingClientRect();
-  const scale = frameRect.width / CARD_WIDTH_MM; // Пикселей на мм
-  chip.style.left = (CHIP_LEFT_MM * scale) + 'px';
-  chip.style.top = (CHIP_TOP_MM * scale) + 'px';
-  chip.style.width = (CHIP_WIDTH_MM * scale) + 'px';
-  chip.style.height = (CHIP_HEIGHT_MM * scale) + 'px';
+  const scale_frame = frameRect.width / CARD_WIDTH_MM;
+  const chipLeft = CHIP_LEFT_MM * scale_frame;
+  const chipTop = CHIP_TOP_MM * scale_frame;
+  const chipWidth = CHIP_WIDTH_MM * scale_frame;
+  const chipHeight = CHIP_HEIGHT_MM * scale_frame;
+  const chipCornerRadius = CHIP_CORNER_RADIUS_MM * scale_frame;
 
-  // Автоматический цвет рамки
+  chip.style.left = chipLeft + 'px';
+  chip.style.top = chipTop + 'px';
+  chip.style.width = chipWidth + 'px';
+  chip.style.height = chipHeight + 'px';
+  chip.style.borderRadius = chipCornerRadius + 'px';
+
   if (imagePreview.src) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = 1;
-    canvas.height = 1;
-    ctx.drawImage(imagePreview, 
-      translateX + frameRect.width * 0.5, 
-      translateY + frameRect.height * 0.5, 
-      1, 1, 0, 0, 1, 1);
-    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
-    frame.style.borderColor = luminance > 128 ? 
-      'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)';
+    const fx = frameRect.width / 2;
+    const fy = frameRect.height / 2;
+    const px = (fx - translateX) / scale;
+    const py = (fy - translateY) / scale;
+    if (px >= 0 && px < imagePreview.naturalWidth && py >= 0 && py < imagePreview.naturalHeight) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 1;
+      canvas.height = 1;
+      ctx.drawImage(imagePreview, px, py, 1, 1, 0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+      frame.style.borderColor = luminance > 128 ? 
+        'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)';
+    } else {
+      frame.style.borderColor = 'rgba(0,0,0,0.7)';
+    }
   }
 }
 
@@ -111,12 +123,12 @@ imageUpload.addEventListener('change', function (e) {
       const frameRect = frame.getBoundingClientRect();
       const imageWidth = imagePreview.naturalWidth;
       const imageHeight = imagePreview.naturalHeight;
-      
+
       let initialScale = Math.min(
-        frameRect.width / imageWidth, 
+        frameRect.width / imageWidth,
         frameRect.height / imageHeight
       );
-      
+
       if (imageWidth <= frameRect.width && imageHeight <= frameRect.height) {
         initialScale = 1;
       }
@@ -249,10 +261,20 @@ async function submitImage() {
   canvas.height = 757;
 
   const frameRect = frame.getBoundingClientRect();
-  const sx = (frameRect.left - imagePreview.getBoundingClientRect().left) / scale;
-  const sy = (frameRect.top - imagePreview.getBoundingClientRect().top) / scale;
-  const sWidth = frameRect.width / scale;
-  const sHeight = frameRect.height / scale;
+  const frameStyle = window.getComputedStyle(frame);
+  const borderLeftWidth = parseFloat(frameStyle.borderLeftWidth);
+  const borderTopWidth = parseFloat(frameStyle.borderTopWidth);
+  const borderRightWidth = parseFloat(frameStyle.borderRightWidth);
+  const borderBottomWidth = parseFloat(frameStyle.borderBottomWidth);
+  const contentLeft = frameRect.left + borderLeftWidth;
+  const contentTop = frameRect.top + borderTopWidth;
+  const contentWidth = frameRect.width - borderLeftWidth - borderRightWidth;
+  const contentHeight = frameRect.height - borderTopWidth - borderBottomWidth;
+
+  const sx = (contentLeft - imagePreview.getBoundingClientRect().left) / scale;
+  const sy = (contentTop - imagePreview.getBoundingClientRect().top) / scale;
+  const sWidth = contentWidth / scale;
+  const sHeight = contentHeight / scale;
 
   const img = new Image();
   img.src = imagePreview.src;
@@ -279,15 +301,14 @@ async function submitImage() {
     // Отрисовка чипа с закругленными углами
     const chipImg = document.getElementById('chipImage');
     const scaleCanvasX = canvas.width / CARD_WIDTH_MM;
-    const scaleCanvasY = canvas.height / CARD_HEIGHT_MM;
     const chipCanvasLeft = CHIP_LEFT_MM * scaleCanvasX;
-    const chipCanvasTop = CHIP_TOP_MM * scaleCanvasY;
+    const chipCanvasTop = CHIP_TOP_MM * scaleCanvasX;
     const chipCanvasWidth = CHIP_WIDTH_MM * scaleCanvasX;
-    const chipCanvasHeight = CHIP_HEIGHT_MM * scaleCanvasY;
+    const chipCanvasHeight = CHIP_HEIGHT_MM * scaleCanvasX;
+    const chipCornerRadiusCanvas = CHIP_CORNER_RADIUS_MM * scaleCanvasX;
     
-    // Сохраняем контекст перед применением маски
     ctx.save();
-    roundedRect(ctx, chipCanvasLeft, chipCanvasTop, chipCanvasWidth, chipCanvasHeight, 28); // 28 пикселей для масштаба 1200 пикселей
+    roundedRect(ctx, chipCanvasLeft, chipCanvasTop, chipCanvasWidth, chipCanvasHeight, chipCornerRadiusCanvas);
     ctx.clip();
     
     await new Promise((resolve) => {
@@ -296,7 +317,6 @@ async function submitImage() {
     });
     ctx.drawImage(chipImg, chipCanvasLeft, chipCanvasTop, chipCanvasWidth, chipCanvasHeight);
     
-    // Восстанавливаем контекст
     ctx.restore();
 
     const blob = await new Promise(resolve => {
